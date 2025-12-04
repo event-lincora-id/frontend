@@ -31,7 +31,7 @@
         <div class="bg-neutral-50 md:col-span-2 flex items-center justify-center px-6 md:px-10">
             <div class="w-full max-w-md bg-white border border-gray-100 rounded-2xl shadow-xl px-7 py-8 md:px-8 md:py-10">
                 <h2 class="text-3xl font-extrabold text-gray-900">Buat Akun</h2>
-                <p class="mt-1 text-sm text-gray-500">Daftar sebagai Admin atau Participant</p>
+                <p class="mt-1 text-sm text-gray-500">Daftar sebagai Event Organizer atau Participant</p>
 
         <form class="mt-8 space-y-6" method="POST" action="{{ route('register') }}">
             @csrf
@@ -61,7 +61,7 @@
                     <select id="role" name="role" required 
                             class="mt-2 block w-full rounded-lg border border-gray-200 bg-white ring-1 ring-gray-100 px-3 py-2.5 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm @error('role') border-red-500 @enderror">
                         <option value="">Pilih role</option>
-                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
+                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Event Organizer</option>
                         <option value="participant" {{ old('role') == 'participant' ? 'selected' : '' }}>Participant</option>
                     </select>
                     @error('role')
@@ -94,7 +94,7 @@
                     <div class="flex items-start">
                         <i class="fas fa-crown text-[#4B0F0F] mt-0.5 mr-2"></i>
                         <div>
-                            <strong>Admin:</strong> Akses penuh ke dashboard, manajemen pengguna, event, dan analitik.
+                            <strong>Event Organizer:</strong> Akses penuh ke dashboard, manajemen pengguna, event, dan analitik.
                         </div>
                     </div>
                     <div class="flex items-start">

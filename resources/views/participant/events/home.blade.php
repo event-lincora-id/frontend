@@ -26,16 +26,15 @@
                         @foreach($events as $event)
                             <div class="flex-shrink-0 w-80 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                                 <!-- Event Image -->
-                                <div class="h-48 bg-gray-300 flex items-center justify-center">
-                                    @if($event->image)
-                                        <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
-                                    @else
-                                        <div class="text-center text-gray-500">
-                                            <i class="fas fa-calendar-alt text-4xl mb-2"></i>
-                                            <p class="text-sm">{{ $event->category->name ?? 'Event' }}</p>
-                                        </div>
-                                    @endif
-                                </div>
+                                <div class="h-48 overflow-hidden">
+    @if($event->image)
+        <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
+    @else
+    <img src="https://picsum.photos/600/400" 
+     alt="Dummy Event" class="w-full h-full object-cover">
+    @endif
+</div>
+
                                 <!-- Event Details -->
                                 <div class="p-4 bg-pink-100">
                                     <h3 class="font-semibold text-gray-900 mb-2 line-clamp-2">
@@ -63,8 +62,6 @@
         </div>
 
         <!-- Large Placeholder Section -->
-        <div class="bg-gray-100 h-32 mb-8 rounded-lg"></div>
-
         <!-- Nearest Event Section -->
         <div class="bg-gray-100 mb-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-4">Nearest Event</h2>
@@ -73,16 +70,15 @@
                     @foreach($events as $event)
                         <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                             <!-- Event Image -->
-                            <div class="h-48 bg-gray-300 flex items-center justify-center">
-                                @if($event->image)
-                                    <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
-                                @else
-                                    <div class="text-center text-gray-500">
-                                        <i class="fas fa-calendar-alt text-4xl mb-2"></i>
-                                        <p class="text-sm">{{ $event->category->name ?? 'Event' }}</p>
-                                    </div>
-                                @endif
-                            </div>
+                            <div class="h-48 overflow-hidden">
+    @if($event->image)
+        <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
+    @else
+    <img src="https://picsum.photos/600/400" 
+    alt="Dummy Event" class="w-full h-full object-cover">
+    @endif
+</div>
+
                             <!-- Event Details -->
                             <div class="p-4 bg-pink-100">
                                 <h3 class="font-semibold text-gray-900 mb-2 line-clamp-2">
