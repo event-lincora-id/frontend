@@ -13,6 +13,12 @@ use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\ParticipantEventController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AttendanceController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+use App\Models\User;
 
 // Home page - redirect to home route
 Route::get('/', function () {
@@ -34,6 +40,65 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/auth/create-session', [AuthController::class, 'createSessionFromToken'])->name('auth.create-session');
+    Route::get('/forgot-password', function () {return view('auth.forgot-password');})->name('password.request');
+    Route::get('/reset-password/{token}', function ($token) {return view('auth.reset-password', ['token' => $token]);})->name('password.reset');
+    // Handle forgot password (server-side simplified)
+Route::post('/forgot-password', function (Request $request) {
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email',
+    ]);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    $email = $request->input('email');
+
+    // Generate token and store in cache for 60 minutes
+    $token = Str::random(60);
+    $cacheKey = 'password_reset_' . $email;
+    Cache::put($cacheKey, $token, now()->addHour());
+
+    $resetUrl = url('/reset-password/' . $token . '?email=' . urlencode($email));
+
+    return back()->with([
+        'reset_token' => $token,
+        'reset_url' => $resetUrl,
+        'message' => 'Token reset berhasil dibuat. Salin token atau klik link untuk melanjutkan.'
+    ]);
+})->name('password.email');
+
+// Handle reset password (server-side simplified)
+Route::post('/reset-password', function (Request $request) {
+    $validator = Validator::make($request->all(), [
+        'token' => 'required',
+        'email' => 'required|email|exists:users,email',
+        'password' => 'required|string|min:8|confirmed',
+    ]);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    $email = $request->input('email');
+    $token = $request->input('token');
+    $cacheKey = 'password_reset_' . $email;
+    $cachedToken = Cache::get($cacheKey);
+
+    if (!$cachedToken || $cachedToken !== $token) {
+        return back()->withErrors(['token' => 'Token tidak valid atau sudah kedaluwarsa. Silakan buat token baru.'])->withInput();
+    }
+
+    // Update user password
+    $user = User::where('email', $email)->first();
+    $user->password = Hash::make($request->input('password'));
+    $user->save();
+
+    // Remove token from cache
+    Cache::forget($cacheKey);
+
+    return redirect()->route('login')->with('success', 'Password berhasil direset. Silakan login dengan password baru.');
+})->name('password.update');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

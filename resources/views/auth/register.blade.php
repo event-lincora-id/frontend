@@ -30,6 +30,12 @@
         <!-- Right side: form card -->
         <div class="bg-neutral-50 md:col-span-2 flex items-center justify-center px-6 md:px-10">
             <div class="w-full max-w-md bg-white border border-gray-100 rounded-2xl shadow-xl px-7 py-8 md:px-8 md:py-10">
+                <!-- Back to Home Button -->
+                <a href="/" class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6 group transition">
+                    <i class="fas fa-arrow-left text-gray-500 group-hover:text-gray-700 transition"></i>
+                    <span class="group-hover:underline">Kembali ke Beranda</span>
+                </a>
+
                 <h2 class="text-3xl font-extrabold text-gray-900">Buat Akun</h2>
                 <p class="mt-1 text-sm text-gray-500">Daftar sebagai Event Organizer atau Participant</p>
 

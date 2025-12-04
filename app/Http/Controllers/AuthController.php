@@ -92,6 +92,103 @@ class AuthController extends Controller
 
         return redirect()->route('login');
     }
+    
+/**
+ * Send password reset link (Simplified - tanpa email)
+ */
+public function forgotPassword(Request $request): JsonResponse
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation errors',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        // Generate random token
+        $token = Str::random(60);
+        
+        // Store token in cache with 1 hour expiration
+        $cacheKey = 'password_reset_' . $request->email;
+        cache()->put($cacheKey, [
+            'token' => $token,
+            'email' => $request->email,
+            'created_at' => now()
+        ], now()->addHour());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset token generated',
+            'data' => [
+                'token' => $token, // Untuk testing, tampilkan token
+                'reset_url' => url("/reset-password/{$token}?email=" . urlencode($request->email))
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to generate reset token: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Reset password (Simplified)
+ */
+public function resetPassword(Request $request): JsonResponse
+{
+    $validator = Validator::make($request->all(), [
+        'token' => 'required',
+        'email' => 'required|email|exists:users,email',
+        'password' => 'required|string|min:8|confirmed',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation errors',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        // Verify token from cache
+        $cacheKey = 'password_reset_' . $request->email;
+        $cachedData = cache()->get($cacheKey);
+
+        if (!$cachedData || $cachedData['token'] !== $request->token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired reset token'
+            ], 422);
+        }
+
+        // Update password
+        $user = User::where('email', $request->email)->firstOrFail();
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        // Clear cache
+        cache()->forget($cacheKey);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to reset password: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
     /**
      * Create session from API token (compatibility endpoint)
