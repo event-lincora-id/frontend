@@ -37,6 +37,33 @@
                     <!-- Event Title -->
                     <h1 class="text-4xl font-bold text-gray-900 mb-4">{{ $event->title }}</h1>
 
+                    <!-- TOMBOL BOOKMARK -->
+                    <div class="flex items-center gap-3 mb-4">
+                        @auth
+                            <button 
+                                id="bookmarkBtn" 
+                                onclick="toggleBookmark({{ $event->id }})"
+                                class="bookmark-btn flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 {{ auth()->user()->hasBookmarked($event->id) ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}"
+                                data-bookmarked="{{ auth()->user()->hasBookmarked($event->id) ? 'true' : 'false' }}"
+                            >
+                                <i class="fas fa-bookmark mr-2"></i>
+                                <span id="bookmarkText">{{ auth()->user()->hasBookmarked($event->id) ? 'Bookmarked' : 'Bookmark Event' }}</span>
+                            </button>
+                            
+                            <!-- Share Button -->
+                            <button onclick="shareEvent()" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
+                                <i class="fas fa-share-alt mr-2"></i>
+                                Share
+                            </button>
+                        @else
+                            <a href="{{ route('login') }}" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
+                                <i class="fas fa-bookmark mr-2"></i>
+                                Login to Bookmark
+                            </a>
+                        @endauth
+                    </div>
+                    <!-- AKHIR TOMBOL BOOKMARK -->
+
                     <!-- Event Meta -->
                     <div class="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
                         <div class="flex items-center">
@@ -581,4 +608,108 @@
         }
     });
 </script>
+
+<!-- Bookmark JavaScript -->
+<script>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    async function toggleBookmark(eventId) {
+        const btn = document.getElementById('bookmarkBtn');
+        const text = document.getElementById('bookmarkText');
+        const isBookmarked = btn.dataset.bookmarked === 'true';
+
+        try {
+            const response = await fetch(`/participant/bookmarks/${eventId}/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    category: 'saved'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Toggle UI
+                if (data.bookmarked) {
+                    btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                    btn.classList.add('bg-red-600', 'text-white');
+                    text.textContent = 'Bookmarked';
+                    btn.dataset.bookmarked = 'true';
+                    showToast('Event bookmarked successfully! 🎉', 'success');
+                } else {
+                    btn.classList.remove('bg-red-600', 'text-white');
+                    btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                    text.textContent = 'Bookmark Event';
+                    btn.dataset.bookmarked = 'false';
+                    showToast('Bookmark removed', 'info');
+                }
+            } else {
+                showToast(data.message || 'Failed to bookmark event', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Failed to bookmark event', 'error');
+        }
+    }
+
+    function shareEvent() {
+        const url = window.location.href;
+        const title = "{{ $event->title }}";
+        
+        if (navigator.share) {
+            navigator.share({
+                title: title,
+                url: url
+            }).catch(err => console.log('Error sharing:', err));
+        } else {
+            // Fallback: copy to clipboard
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('Link copied to clipboard!', 'success');
+            });
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white shadow-lg z-50 animate-slide-in ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 
+            'bg-blue-600'
+        }`;
+        toast.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s, transform 0.3s';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+</script>
+
+<style>
+    @keyframes slide-in {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+    }
+</style>
 @endsection

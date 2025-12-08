@@ -109,15 +109,29 @@
                     @foreach($events as $event)
                         <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                             <!-- Event Image -->
-                            <div class="h-48 bg-gray-300 flex items-center justify-center">
+                            <div class="relative h-48 bg-gray-300">
                                 @if($event->image)
                                     <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
                                 @else
-                                    <div class="text-center text-gray-500">
-                                        <i class="fas fa-calendar-alt text-4xl mb-2"></i>
-                                        <p class="text-sm">{{ $event->category->name ?? 'Event' }}</p>
+                                    <div class="flex items-center justify-center h-full text-gray-500">
+                                        <div class="text-center">
+                                            <i class="fas fa-calendar-alt text-4xl mb-2"></i>
+                                            <p class="text-sm">{{ $event->category->name ?? 'Event' }}</p>
+                                        </div>
                                     </div>
                                 @endif
+                                
+                                <!-- Bookmark Button -->
+                                @auth
+                                    <button 
+                                        onclick="toggleBookmarkCard({{ $event->id }}, this, event)"
+                                        class="bookmark-btn-card absolute top-3 right-3 w-10 h-10 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center {{ auth()->user()->hasBookmarked($event->id) ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100' }}"
+                                        data-bookmarked="{{ auth()->user()->hasBookmarked($event->id) ? 'true' : 'false' }}"
+                                        title="{{ auth()->user()->hasBookmarked($event->id) ? 'Remove bookmark' : 'Bookmark this event' }}"
+                                    >
+                                        <i class="fas fa-bookmark"></i>
+                                    </button>
+                                @endauth
                             </div>
                             <!-- Event Details -->
                             <div class="p-4 bg-pink-100">
@@ -275,6 +289,70 @@
         }
     }
 </script>
+
+<script>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    async function toggleBookmarkCard(eventId, button, event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const isBookmarked = button.dataset.bookmarked === 'true';
+
+        try {
+            const response = await fetch(`/participant/bookmarks/${eventId}/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    category: 'saved'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Toggle UI
+                if (data.bookmarked) {
+                    button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+                    button.classList.add('bg-red-600', 'text-white');
+                    button.dataset.bookmarked = 'true';
+                    button.title = 'Remove bookmark';
+                    showToast('Bookmarked! 🎉', 'success');
+                } else {
+                    button.classList.remove('bg-red-600', 'text-white');
+                    button.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+                    button.dataset.bookmarked = 'false';
+                    button.title = 'Bookmark this event';
+                    showToast('Bookmark removed', 'info');
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Failed to bookmark', 'error');
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white shadow-lg z-50 ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 
+            'bg-blue-600'
+        }`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+</script>
+
 @endsection
 
 

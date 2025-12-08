@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\Notification;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\DB;
 
 class EventParticipantController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     /**
      * Join an event
      */
@@ -78,6 +85,11 @@ class EventParticipantController extends Controller
             // Update event registered count
             $event->increment('registered_count');
 
+            //=== NOTIFIKASI KE USER (PARTICIPANT) ===
+            // Send registration success notification to user
+            $this->notificationService->sendRegistrationSuccess($user, $event);
+
+
             // Create notification for organizer
             Notification::create([
                 'user_id' => $event->user_id,
@@ -90,6 +102,22 @@ class EventParticipantController extends Controller
                     'participant_name' => $user->full_name
                 ]
             ]);
+
+            // Jika event berbayar, kirim notifikasi untuk reminder pembayaran
+            if ($event->is_paid && $event->price > 0) {
+                Notification::create([
+                    'user_id' => $user->id,
+                    'event_id' => $event->id,
+                    'type' => 'payment_pending',
+                    'title' => 'Menunggu Pembayaran',
+                    'message' => "Anda berhasil mendaftar untuk event '{$event->title}'. Silakan selesaikan pembayaran sebesar Rp " . number_format($event->price, 0, ',', '.'),
+                    'data' => [
+                        'participant_id' => $participant->id,
+                        'amount' => $event->price,
+                        'event_title' => $event->title
+                    ]
+                ]);
+            }
 
             DB::commit();
 
@@ -155,6 +183,18 @@ class EventParticipantController extends Controller
             $participant->update(['status' => 'cancelled']);
             $event->decrement('registered_count');
 
+            // Send cancellation notification to user
+            Notification::create([
+                'user_id' => $user->id,
+                'event_id' => $event->id,
+                'type' => 'registration_cancelled',
+                'title' => 'Pendaftaran Dibatalkan',
+                'message' => "Pendaftaran Anda untuk event '{$event->title}' telah dibatalkan.",
+                'data' => [
+                    'participant_id' => $participant->id,
+                    'cancelled_at' => now()->toIso8601String()
+                ]
+            ]);
             // Create notification for organizer
             Notification::create([
                 'user_id' => $event->user_id,

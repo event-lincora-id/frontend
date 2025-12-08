@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -18,17 +17,17 @@ class NotificationController extends Controller
     }
 
     /**
-     * Get user's notifications
+     * Display notifications page
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $user = $request->user();
-
+        
         $query = Notification::with(['event'])
             ->where('user_id', $user->id);
 
-        // Filter by type
-        if ($request->has('type')) {
+        // Filter by type if specified
+        if ($request->has('type') && $request->type) {
             $query->where('type', $request->type);
         }
 
@@ -37,22 +36,43 @@ class NotificationController extends Controller
             $query->unread();
         }
 
-        // Filter by event
-        if ($request->has('event_id')) {
-            $query->where('event_id', $request->event_id);
+        $notifications = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        // Return JSON for testing purposes or if requested via AJAX
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'data' => $notifications
+            ]);
         }
 
-        $perPage = $request->get('per_page', 20);
-        $notifications = $query->orderBy('created_at', 'desc')->paginate($perPage);
+        // Determine which view to return based on user role
+        if ($user->role === 'admin') {
+            return view('admin.notifications.index', compact('notifications'));
+        }
+
+        return view('participant.notifications.index', compact('notifications'));
+    }
+
+    /**
+     * Get unread notification count (AJAX)
+     */
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $count = Notification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
 
         return response()->json([
             'success' => true,
-            'data' => $notifications
+            'count' => $count
         ]);
     }
 
     /**
-     * Mark notification as read
+     * Mark notification as read (AJAX)
      */
     public function markAsRead(Request $request, Notification $notification): JsonResponse
     {
@@ -61,7 +81,7 @@ class NotificationController extends Controller
         if ($notification->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized to mark this notification'
+                'message' => 'Unauthorized'
             ], 403);
         }
 
@@ -69,13 +89,12 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification marked as read',
-            'data' => $notification
+            'message' => 'Notifikasi telah dibaca'
         ]);
     }
 
     /**
-     * Mark all notifications as read
+     * Mark all notifications as read (AJAX)
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
@@ -87,42 +106,13 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'All notifications marked as read',
-            'data' => [
-                'updated_count' => $updated
-            ]
+            'message' => 'Semua notifikasi telah dibaca',
+            'updated_count' => $updated
         ]);
     }
 
     /**
-     * Get unread notification count
-     */
-    public function unreadCount(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        $count = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->count();
-
-        // Count by type
-        $countByType = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->selectRaw('type, COUNT(*) as count')
-            ->groupBy('type')
-            ->pluck('count', 'type');
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'total_unread' => $count,
-                'by_type' => $countByType
-            ]
-        ]);
-    }
-
-    /**
-     * Delete notification
+     * Delete notification (AJAX)
      */
     public function destroy(Request $request, Notification $notification): JsonResponse
     {
@@ -131,7 +121,7 @@ class NotificationController extends Controller
         if ($notification->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized to delete this notification'
+                'message' => 'Unauthorized'
             ], 403);
         }
 
@@ -139,7 +129,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification deleted successfully'
+            'message' => 'Notifikasi berhasil dihapus'
         ]);
     }
 }

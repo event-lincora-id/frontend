@@ -13,6 +13,8 @@ use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\ParticipantEventController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\BookmarkController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -110,6 +112,25 @@ Route::middleware(['auth', 'role:participant'])->group(function () {
     Route::put('/participant/profile', [ParticipantDashboardController::class, 'updateProfile'])->name('participant.profile.update');
     Route::get('/attendance/scanner', [AttendanceController::class, 'scanner'])->name('attendance.scanner');
     Route::post('/attendance/mark', [AttendanceController::class, 'markAttendance'])->name('attendance.mark');
+
+    // Notifications
+    Route::prefix('participant/notifications')->name('participant.notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
+    // Bookmarks
+    Route::prefix('participant/bookmarks')->name('participant.bookmarks.')->group(function () {
+    Route::get('/', [BookmarkController::class, 'index'])->name('index');
+    Route::post('/{event}/toggle', [BookmarkController::class, 'toggle'])->name('toggle');
+    Route::post('/{event}', [BookmarkController::class, 'store'])->name('store');
+    Route::put('/{bookmark}', [BookmarkController::class, 'update'])->name('update');
+    Route::delete('/{event}', [BookmarkController::class, 'destroy'])->name('destroy');
+    Route::get('/{event}/check', [BookmarkController::class, 'check'])->name('check');
+    });
 });
 
 // Public Event Search & Browse (Available to all users)
@@ -172,4 +193,13 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
     // Finance
     Route::get('/finance', [FinanceController::class, 'index'])->name('admin.finance.index');
     Route::get('/events/{event}/finance', [FinanceController::class, 'show'])->name('admin.events.finance');
+
+    Route::prefix('notifications')->name('admin.notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+        Route::post('/{notification}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    });
+
 });

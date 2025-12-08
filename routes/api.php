@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BookmarkController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\EventParticipantController;
@@ -48,6 +49,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+    });
+
+    // Bookmarks
+    Route::prefix('bookmarks')->group(function () {
+    Route::get('/', [BookmarkController::class, 'index']);
+    Route::post('/{event}/toggle', [BookmarkController::class, 'toggle']);
+    Route::post('/{event}', [BookmarkController::class, 'store']);
+    Route::delete('/{event}', [BookmarkController::class, 'destroy']);
+    Route::get('/{event}/check', [BookmarkController::class, 'check']);
     });
 
     // Profile routes

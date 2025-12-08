@@ -35,6 +35,12 @@
                        class="px-4 py-2 rounded-md text-sm font-medium {{ request()->routeIs('participant.dashboard') ? 'bg-red-700 text-white' : 'bg-white text-gray-900 hover:bg-gray-100' }}">
                         Participation
                     </a>
+                    @auth
+                    <a href="{{ route('participant.bookmarks.index') }}" 
+                    class="px-4 py-2 rounded-md text-sm font-medium {{ request()->routeIs('participant.bookmarks.*') ? 'bg-red-700 text-white' : 'bg-white text-gray-900 hover:bg-gray-100' }}">
+                        Bookmarks
+                    </a>
+                    @endauth
                 </div>
                 
                 <!-- User Menu -->
@@ -44,10 +50,40 @@
                             Welcome, {{ Auth::user()->full_name ?? Auth::user()->name }}
                         </span>
                         <div class="flex items-center space-x-2">
-                            <!-- Notifications -->
-                            <button class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Notifikasi">
-                                <i class="fas fa-bell text-sm"></i>
-                            </button>
+                            <!-- Notifications dengan badge -->
+<div class="relative">
+    <a href="{{ route('participant.notifications.index') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Notifikasi">
+        <i class="fas fa-bell text-sm"></i>
+        <span id="notification-badge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center hidden">
+            0
+        </span>
+    </a>
+</div>
+<script>
+// Load unread notification count
+async function loadNotificationCount() {
+    try {
+        const response = await fetch('/participant/notifications/unread-count');
+        const data = await response.json();
+        
+        if (data.success && data.count > 0) {
+            const badge = document.getElementById('notification-badge');
+            if (badge) {
+                badge.textContent = data.count > 99 ? '99+' : data.count;
+                badge.classList.remove('hidden');
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load notification count:', error);
+    }
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadNotificationCount);
+
+// Refresh every 30 seconds
+setInterval(loadNotificationCount, 30000);
+</script>
                             <!-- Guide shortcut -->
                             <a href="{{ route('guide') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Panduan">
                                 <i class="fas fa-book-open text-sm"></i>

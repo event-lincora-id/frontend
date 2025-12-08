@@ -105,4 +105,23 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class);
     }
+
+    //Bookmark relationships
+    public function bookmarks()
+    {
+        return $this->hasMany(EventBookmark::class);
+    }
+
+    public function bookmarkedEvents()
+    {
+        return $this->belongsToMany(Event::class, 'event_bookmarks')
+                    ->withPivot('category', 'notes')
+                    ->withTimestamps();
+    }
+
+    // Helper method untuk cek apakah event sudah di-bookmark
+    public function hasBookmarked($eventId)
+    {
+        return $this->bookmarks()->where('event_id', $eventId)->exists();
+    }
 }

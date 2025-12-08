@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Log;
 use App\Models\EventParticipant;
 use App\Models\Event;
+use App\Models\Notification;
 use Xendit\Configuration;
 use Xendit\Invoice\InvoiceApi;
 use Xendit\Invoice\CreateInvoiceRequest;
@@ -16,14 +17,16 @@ class PaymentService
     protected $webhookToken;
     protected $callbackUrl;
     protected $redirectUrl;
+    protected $notificationService; 
 
-    public function __construct()
+    public function __construct(NotificationService $notificationService)
     {
         $this->secretKey = config('services.xendit.secret_key');
         $this->publicKey = config('services.xendit.public_key');
         $this->webhookToken = config('services.xendit.webhook_token');
         $this->callbackUrl = config('services.xendit.callback_url');
         $this->redirectUrl = config('services.xendit.redirect_url');
+        $this->notificationService = $notificationService;
         
         // Configure Xendit SDK
         Configuration::setXenditKey($this->secretKey);
@@ -230,18 +233,16 @@ class PaymentService
             $paymentMethod = $webhookData['payment_method'] ?? 'unknown';
 
             // Extract participant ID from external_id
-            if (strpos($externalId, 'event_payment_') === 0) {
-                $participantId = explode('_', $externalId)[2];
-            } elseif (strpos($externalId, 'event_va_') === 0) {
-                $participantId = explode('_', $externalId)[2];
-            } elseif (strpos($externalId, 'event_ewallet_') === 0) {
-                $participantId = explode('_', $externalId)[2];
+            if (strpos($externalId, 'event_') === 0) {
+                // Format: event_{event_id}_participant_{participant_id}_{timestamp}
+                preg_match('/participant_(\d+)/', $externalId, $matches);
+                $participantId = $matches[1] ?? null;
             } else {
                 Log::warning('Unknown external_id format in webhook', ['external_id' => $externalId]);
                 return false;
             }
 
-            $participant = EventParticipant::find($participantId);
+            $participant = EventParticipant::with(['event', 'user'])->find($participantId);
             if (!$participant) {
                 Log::warning('Participant not found for webhook', ['participant_id' => $participantId]);
                 return false;
@@ -256,17 +257,71 @@ class PaymentService
                         'amount_paid' => $webhookData['amount'] ?? $participant->event->price,
                         'paid_at' => now(),
                     ]);
+
+                    // === KIRIM NOTIFIKASI PAYMENT SUCCESS KE USER ===
+                    $this->notificationService->sendPaymentConfirmation(
+                        $participant->user,
+                        $participant->event,
+                        $participant
+                    );
+
+                    // === KIRIM NOTIFIKASI KE ORGANIZER ===
+                    Notification::create([
+                        'user_id' => $participant->event->user_id,
+                        'event_id' => $participant->event->id,
+                        'type' => 'payment_received',
+                        'title' => 'Pembayaran Diterima',
+                        'message' => "Pembayaran sebesar Rp " . number_format($participant->amount_paid, 0, ',', '.') . 
+                                    " dari {$participant->user->full_name} untuk event '{$participant->event->title}' telah berhasil.",
+                        'data' => [
+                            'participant_id' => $participant->id,
+                            'amount' => $participant->amount_paid,
+                            'payment_method' => $paymentMethod
+                        ]
+                    ]);
+
+                    Log::info('Payment successful notification sent', [
+                        'participant_id' => $participant->id,
+                        'user_id' => $participant->user_id,
+                        'amount' => $participant->amount_paid,
+                    ]);
                     break;
 
                 case 'EXPIRED':
                     $participant->update([
                         'payment_status' => 'expired',
                     ]);
+
+                    // Notifikasi payment expired
+                    Notification::create([
+                        'user_id' => $participant->user_id,
+                        'event_id' => $participant->event->id,
+                        'type' => 'payment_expired',
+                        'title' => 'Pembayaran Kedaluwarsa',
+                        'message' => "Waktu pembayaran untuk event '{$participant->event->title}' telah habis. Silakan lakukan pendaftaran ulang jika masih ingin mengikuti event.",
+                        'data' => [
+                            'participant_id' => $participant->id,
+                            'event_title' => $participant->event->title
+                        ]
+                    ]);
                     break;
 
                 case 'FAILED':
                     $participant->update([
                         'payment_status' => 'failed',
+                    ]);
+
+                    // Notifikasi payment failed
+                    Notification::create([
+                        'user_id' => $participant->user_id,
+                        'event_id' => $participant->event->id,
+                        'type' => 'payment_failed',
+                        'title' => 'Pembayaran Gagal',
+                        'message' => "Pembayaran untuk event '{$participant->event->title}' gagal. Silakan coba lagi atau hubungi support.",
+                        'data' => [
+                            'participant_id' => $participant->id,
+                            'event_title' => $participant->event->title
+                        ]
                     ]);
                     break;
 
