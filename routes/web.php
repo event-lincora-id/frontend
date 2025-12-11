@@ -1,7 +1,41 @@
 <?php
 
+Route::get('/test-api', function () {
+    try {
+        $api = app(\App\Services\BackendApiService::class);
+        
+        // Test 1: Get all events (no filter)
+        $response1 = $api->get('events');
+        
+        // Test 2: Get categories
+        $response2 = $api->get('categories');
+        
+        // Test 3: Get events with published filter
+        $response3 = $api->get('events', ['status' => 'published']);
+        
+        return response()->json([
+            'events_no_filter' => [
+                'count' => count($response1['data']['data'] ?? []),
+                'total' => $response1['data']['total'] ?? null,
+                'message' => $response1['message'] ?? null,
+            ],
+            'categories' => [
+                'count' => count($response2['data'] ?? []),
+                'data' => $response2['data'] ?? [],
+            ],
+            'events_published_filter' => [
+                'count' => count($response3['data']['data'] ?? []),
+                'total' => $response3['data']['total'] ?? null,
+                'first_event' => $response3['data']['data'][0] ?? null,
+            ],
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\ParticipantDashboardController;
 use App\Http\Controllers\AuthController;
@@ -15,12 +49,12 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BookmarkController;
+use App\Http\Controllers\EventParticipationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Models\User;
 
 // Home page - redirect to home route
 Route::get('/', function () {
@@ -42,74 +76,30 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/auth/create-session', [AuthController::class, 'createSessionFromToken'])->name('auth.create-session');
-    Route::get('/forgot-password', function () {return view('auth.forgot-password');})->name('password.request');
-    Route::get('/reset-password/{token}', function ($token) {return view('auth.reset-password', ['token' => $token]);})->name('password.reset');
-    // Handle forgot password (server-side simplified)
-Route::post('/forgot-password', function (Request $request) {
-    $validator = Validator::make($request->all(), [
-        'email' => 'required|email|exists:users,email',
-    ]);
 
-    if ($validator->fails()) {
-        return back()->withErrors($validator)->withInput();
-    }
+    // Forgot & Reset Password
+    Route::get('/forgot-password', function () {
+    return view('auth.forgot-password');
+})->name('password.request');
 
-    $email = $request->input('email');
-
-    // Generate token and store in cache for 60 minutes
-    $token = Str::random(60);
-    $cacheKey = 'password_reset_' . $email;
-    Cache::put($cacheKey, $token, now()->addHour());
-
-    $resetUrl = url('/reset-password/' . $token . '?email=' . urlencode($email));
-
-    return back()->with([
-        'reset_token' => $token,
-        'reset_url' => $resetUrl,
-        'message' => 'Token reset berhasil dibuat. Salin token atau klik link untuk melanjutkan.'
-    ]);
+Route::post('/forgot-password', function () {
+    return back()->withErrors([
+        'email' => 'Fitur reset password belum tersedia. Silakan hubungi administrator untuk reset password Anda.'
+    ])->withInput();
 })->name('password.email');
-
-// Handle reset password (server-side simplified)
-Route::post('/reset-password', function (Request $request) {
-    $validator = Validator::make($request->all(), [
-        'token' => 'required',
-        'email' => 'required|email|exists:users,email',
-        'password' => 'required|string|min:8|confirmed',
-    ]);
-
-    if ($validator->fails()) {
-        return back()->withErrors($validator)->withInput();
-    }
-
-    $email = $request->input('email');
-    $token = $request->input('token');
-    $cacheKey = 'password_reset_' . $email;
-    $cachedToken = Cache::get($cacheKey);
-
-    if (!$cachedToken || $cachedToken !== $token) {
-        return back()->withErrors(['token' => 'Token tidak valid atau sudah kedaluwarsa. Silakan buat token baru.'])->withInput();
-    }
-
-    // Update user password
-    $user = User::where('email', $email)->first();
-    $user->password = Hash::make($request->input('password'));
-    $user->save();
-
-    // Remove token from cache
-    Cache::forget($cacheKey);
-
-    return redirect()->route('login')->with('success', 'Password berhasil direset. Silakan login dengan password baru.');
-})->name('password.update');
+    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 });
+// Handle reset password (server-side simplified)
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Participant Dashboard
-Route::middleware(['auth', 'role:participant'])->group(function () {
+Route::middleware(['api.auth', 'api.role:participant'])->group(function () {
     Route::get('/participant/dashboard', [ParticipantDashboardController::class, 'index'])->name('participant.dashboard');
     Route::get('/participant/profile', [ParticipantDashboardController::class, 'profile'])->name('participant.profile');
     Route::put('/participant/profile', [ParticipantDashboardController::class, 'updateProfile'])->name('participant.profile.update');
+    Route::post('/participant/profile/change-password', [ParticipantDashboardController::class, 'changePassword'])->name('participant.profile.change-password');
     Route::get('/attendance/scanner', [AttendanceController::class, 'scanner'])->name('attendance.scanner');
     Route::post('/attendance/mark', [AttendanceController::class, 'markAttendance'])->name('attendance.mark');
 
@@ -136,7 +126,17 @@ Route::middleware(['auth', 'role:participant'])->group(function () {
 // Public Event Search & Browse (Available to all users)
 Route::get('/', [ParticipantEventController::class, 'home'])->name('home');
 Route::get('/events', [ParticipantEventController::class, 'index'])->name('events.index');
+Route::get('/events/explore', [ParticipantEventController::class, 'index'])->name('events.explore');
 Route::get('/events/{event}', [ParticipantEventController::class, 'show'])->name('events.show');
+
+// Event Participation (Requires Auth)
+Route::middleware(['api.auth'])->group(function () {
+    Route::post('/events/{event}/register', [EventParticipationController::class, 'register'])->name('events.register');
+    Route::get('/my-participations', [EventParticipationController::class, 'myParticipations'])->name('my.participations');
+    Route::get('/participations/{participation}/qr-code', [EventParticipationController::class, 'showQrCode'])->name('participations.qr-code');
+    Route::delete('/participations/{participation}', [EventParticipationController::class, 'cancel'])->name('participations.cancel');
+    Route::post('/events/{event}/attendance', [EventParticipationController::class, 'checkAttendance'])->name('events.check-attendance');
+});
 
 // Payment pages
 Route::get('/payments/success', [PaymentController::class, 'success'])->name('payments.success');
@@ -144,7 +144,7 @@ Route::get('/payments/failure', [PaymentController::class, 'failure'])->name('pa
 Route::get('/payments/status/{participant}', [PaymentController::class, 'status'])->name('payments.status');
 
         // Admin Dashboard Routes (Organizer-specific data)
-        Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+        Route::middleware(['api.auth', 'api.role:admin'])->prefix('admin')->group(function () {
     // Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
     

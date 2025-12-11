@@ -2,19 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Event;
-use App\Models\Category;
-use App\Models\User;
 use Illuminate\Http\Request;
+use App\Services\BackendApiService;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class EventController extends Controller
 {
-    public function __construct()
+    protected BackendApiService $api;
+
+    public function __construct(BackendApiService $api)
     {
-        // Role validation is handled by middleware in routes
+        $this->api = $api;
     }
 
     /**
@@ -22,52 +23,123 @@ class EventController extends Controller
      */
     public function index(Request $request)
     {
-        $organizerId = auth()->id();
-        $query = Event::with(['category', 'organizer']);
+        try {
+            $token = Session::get('api_token');
+            $user = Session::get('user');
 
-        // If not super admin, limit to current organizer's events
-        if (!(auth()->check() && method_exists(auth()->user(), 'isSuperAdmin') && auth()->user()->isSuperAdmin())) {
-            $query->where('user_id', $organizerId); // Only organizer's events
+            if (!$token || !$user) {
+                return redirect()->route('login');
+            }
+
+            // Build query parameters
+            $params = [];
+            
+            if ($request->has('search') && $request->search) {
+                $params['search'] = $request->search;
+            }
+            
+            if ($request->has('category_id') && $request->category_id) {
+                $params['category_id'] = $request->category_id;
+            }
+            
+            if ($request->has('status') && $request->status) {
+                $params['status'] = $request->status;
+            }
+
+            // Try different endpoints
+            $eventsData = [];
+            
+            try {
+                // Try /events/my-events first
+                $response = $this->api->withToken($token)->get('events/my-events', $params);
+                Log::info('API Response from events/my-events:', $response);
+                
+                // Handle different response structures
+                if (isset($response['data'])) {
+                    if (isset($response['data']['data'])) {
+                        // Paginated response
+                        $eventsData = $response['data']['data'];
+                    } elseif (is_array($response['data'])) {
+                        // Direct array
+                        $eventsData = $response['data'];
+                    }
+                } elseif (isset($response['events'])) {
+                    $eventsData = $response['events'];
+                }
+                
+            } catch (\Exception $e) {
+                Log::warning('events/my-events failed, trying /events: ' . $e->getMessage());
+                
+                // Fallback: try /events with user filter
+                try {
+                    $response = $this->api->withToken($token)->get('events', $params);
+                    Log::info('API Response from /events:', $response);
+                    
+                    if (isset($response['data'])) {
+                        if (isset($response['data']['data'])) {
+                            $eventsData = $response['data']['data'];
+                        } elseif (is_array($response['data'])) {
+                            $eventsData = $response['data'];
+                        }
+                    }
+                    
+                    // Filter by current user (organizer)
+                    $userId = $user['id'] ?? null;
+                    if ($userId) {
+                        $eventsData = array_filter($eventsData, function($event) use ($userId) {
+                            return isset($event['user_id']) && $event['user_id'] == $userId;
+                        });
+                        $eventsData = array_values($eventsData);
+                    }
+                    
+                } catch (\Exception $e2) {
+                    Log::error('Both endpoints failed: ' . $e2->getMessage());
+                }
+            }
+            
+            Log::info('Total events found: ' . count($eventsData));
+            
+            // Convert arrays to objects
+            $eventsData = array_map(function($event) {
+                return $this->arrayToObject($event);
+            }, $eventsData);
+
+            // Manual pagination
+            $perPage = 10;
+            $currentPage = $request->get('page', 1);
+            $total = count($eventsData);
+            $offset = ($currentPage - 1) * $perPage;
+            $paginatedData = array_slice($eventsData, $offset, $perPage);
+
+            $events = new LengthAwarePaginator(
+                $paginatedData,
+                $total,
+                $perPage,
+                $currentPage,
+                [
+                    'path' => $request->url(),
+                    'query' => $request->query(),
+                ]
+            );
+
+            // Get categories for filter
+            $categoriesResponse = $this->api->get('categories');
+            $categoriesData = $categoriesResponse['data'] ?? [];
+            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+
+            return view('admin.events.index', compact('events', 'categories'));
+
+        } catch (\Exception $e) {
+            Log::error('Events index error: ' . $e->getMessage());
+            
+            $events = new LengthAwarePaginator([], 0, 10, 1, ['path' => $request->url()]);
+            
+            return view('admin.events.index', [
+                'events' => $events,
+                'categories' => [],
+                'error' => 'Tidak dapat memuat data events: ' . $e->getMessage()
+            ]);
         }
-
-        // Search functionality
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('location', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by category
-        if ($request->has('category_id') && $request->category_id) {
-            $query->where('category_id', $request->category_id);
-        }
-
-        // Filter by status
-        if ($request->has('status') && $request->status) {
-            $query->where('status', $request->status);
-        }
-
-        // For super admin: allow filter by organizer
-        if ($request->has('organizer_id') && $request->organizer_id) {
-            $query->where('user_id', $request->organizer_id);
-        }
-
-        // Filter by date range
-        if ($request->has('date_from') && $request->date_from) {
-            $query->where('start_date', '>=', $request->date_from);
-        }
-
-        if ($request->has('date_to') && $request->date_to) {
-            $query->where('start_date', '<=', $request->date_to);
-        }
-
-        $events = $query->orderBy('start_date', 'desc')->paginate(10);
-        $categories = Category::all();
-
-        return view('admin.events', compact('events', 'categories'));
     }
 
     /**
@@ -75,10 +147,18 @@ class EventController extends Controller
      */
     public function create()
     {
-        $categories = Category::all();
-        $organizers = User::where('role', 'admin')->get(); // Admin = Event Organizer
-        
-        return view('admin.events.create', compact('categories', 'organizers'));
+        try {
+            $categoriesResponse = $this->api->get('categories');
+            $categoriesData = $categoriesResponse['data'] ?? [];
+            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+
+            return view('admin.events.create', compact('categories'));
+
+        } catch (\Exception $e) {
+            Log::error('Events create form error: ' . $e->getMessage());
+            return redirect()->route('admin.events.index')
+                ->with('error', 'Tidak dapat memuat form: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -89,17 +169,13 @@ class EventController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-            'start_date' => 'required|date|after:now',
+            'category_id' => 'required|integer',
+            'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'location' => 'required|string|max:255',
-            'event_type' => 'nullable|in:offline,online,hybrid',
-            'contact_info' => 'nullable|string',
-            'requirements' => 'nullable|string',
             'quota' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'status' => 'required|in:draft,published,cancelled,completed',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -108,89 +184,123 @@ class EventController extends Controller
                 ->withInput();
         }
 
-        $data = $request->all();
-        $data['user_id'] = auth()->id(); // Set organizer as event creator
-        
-        // Set is_paid based on price
-        $data['is_paid'] = $request->price > 0;
-        
-        // Rename max_participants to quota
-        if (isset($data['max_participants'])) {
-            $data['quota'] = $data['max_participants'];
-            unset($data['max_participants']);
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return redirect()->route('login')
+                    ->with('error', 'Silakan login terlebih dahulu');
+            }
+
+            // Only send fields that exist in database
+            $data = [
+                'title' => $request->title,
+                'description' => $request->description,
+                'category_id' => (int) $request->category_id,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'location' => $request->location,
+                'quota' => (int) $request->quota,
+                'price' => (float) $request->price,
+                'status' => $request->status,
+            ];
+
+            Log::info('Creating event with data:', $data);
+
+            $response = $this->api->withToken($token)->post('events', $data);
+
+            Log::info('Event created response:', $response);
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.events.index')
+                    ->with('success', 'Event berhasil dibuat!');
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal membuat event')
+                ->withInput();
+
+        } catch (\Exception $e) {
+            Log::error('Events store error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage())
+                ->withInput();
         }
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('events', 'public');
-            $data['image'] = $imagePath;
-        }
-
-        // Generate QR code
-        $qrCodeString = 'event_' . time() . '_' . uniqid();
-        
-        // Store QR code string first
-        $data['qr_code'] = $qrCodeString;
-
-        $event = Event::create($data);
-
-        // Generate QR code image (using SVG format for better compatibility)
-        // Ensure destination directory exists to avoid file_put_contents errors
-        $qrCodesDir = storage_path('app/public/qr_codes');
-        if (!is_dir($qrCodesDir)) {
-            mkdir($qrCodesDir, 0755, true);
-        }
-
-        $qrCodePath = 'qr_codes/' . $qrCodeString . '.svg';
-        QrCode::format('svg')->size(200)->generate($qrCodeString, storage_path('app/public/' . $qrCodePath));
-        
-        // Update with image path for display, but keep original string for searching
-        // We'll store both: use qr_code for display path, but search works with basename
-        $event->update(['qr_code' => $qrCodePath]);
-
-        return redirect()->route('admin.events.index')
-            ->with('success', 'Event created successfully!');
     }
 
     /**
      * Display the specified event
      */
-    public function show(Event $event)
+    public function show($id)
     {
-        $event->load(['category', 'organizer', 'participants.user']);
-        return view('admin.events.show', compact('event'));
+        try {
+            $token = Session::get('api_token');
+            
+            $response = $this->api->withToken($token)->get("events/{$id}");
+            $eventData = $response['data'] ?? null;
+
+            if (!$eventData) {
+                return redirect()->route('admin.events.index')
+                    ->with('error', 'Event tidak ditemukan');
+            }
+
+            $event = $this->arrayToObject($eventData);
+
+            return view('admin.events.show', compact('event'));
+
+        } catch (\Exception $e) {
+            Log::error('Events show error: ' . $e->getMessage());
+            return redirect()->route('admin.events.index')
+                ->with('error', 'Tidak dapat memuat detail event');
+        }
     }
 
     /**
      * Show the form for editing the specified event
      */
-    public function edit(Event $event)
+    public function edit($id)
     {
-        $categories = Category::all();
-        $organizers = User::where('role', 'admin')->get(); // Admin = Event Organizer
-        
-        return view('admin.events.edit', compact('event', 'categories', 'organizers'));
+        try {
+            $token = Session::get('api_token');
+            
+            $response = $this->api->withToken($token)->get("events/{$id}");
+            $eventData = $response['data'] ?? null;
+
+            if (!$eventData) {
+                return redirect()->route('admin.events.index')
+                    ->with('error', 'Event tidak ditemukan');
+            }
+
+            $event = $this->arrayToObject($eventData);
+
+            $categoriesResponse = $this->api->get('categories');
+            $categoriesData = $categoriesResponse['data'] ?? [];
+            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+
+            return view('admin.events.edit', compact('event', 'categories'));
+
+        } catch (\Exception $e) {
+            Log::error('Events edit form error: ' . $e->getMessage());
+            return redirect()->route('admin.events.index')
+                ->with('error', 'Tidak dapat memuat form edit');
+        }
     }
 
     /**
      * Update the specified event
      */
-    public function update(Request $request, Event $event)
+    public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'required|integer',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'location' => 'required|string|max:255',
-            'event_type' => 'nullable|in:offline,online,hybrid',
-            'contact_info' => 'nullable|string',
-            'requirements' => 'nullable|string',
             'quota' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'status' => 'required|in:draft,published,cancelled,completed',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -199,73 +309,187 @@ class EventController extends Controller
                 ->withInput();
         }
 
-        $data = $request->all();
-        $data['user_id'] = auth()->id(); // Ensure organizer owns the event
-        
-        // Set is_paid based on price
-        $data['is_paid'] = $request->price > 0;
-        
-        // Rename max_participants to quota if exists
-        if (isset($data['max_participants'])) {
-            $data['quota'] = $data['max_participants'];
-            unset($data['max_participants']);
-        }
-
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            // Delete old image
-            if ($event->image) {
-                Storage::disk('public')->delete($event->image);
-            }
+        try {
+            $token = Session::get('api_token');
             
-            $imagePath = $request->file('image')->store('events', 'public');
-            $data['image'] = $imagePath;
+            if (!$token) {
+                return redirect()->route('login')
+                    ->with('error', 'Silakan login terlebih dahulu');
+            }
+
+            $data = [
+                'title' => $request->title,
+                'description' => $request->description,
+                'category_id' => (int) $request->category_id,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'location' => $request->location,
+                'quota' => (int) $request->quota,
+                'price' => (float) $request->price,
+                'status' => $request->status,
+            ];
+
+            $response = $this->api->withToken($token)->put("events/{$id}", $data);
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.events.index')
+                    ->with('success', 'Event berhasil diupdate!');
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal mengupdate event')
+                ->withInput();
+
+        } catch (\Exception $e) {
+            Log::error('Events update error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage())
+                ->withInput();
         }
-
-        $event->update($data);
-
-        return redirect()->route('admin.events.index')
-            ->with('success', 'Event updated successfully!');
     }
 
     /**
      * Remove the specified event
      */
-    public function destroy(Event $event)
+    public function destroy($id)
     {
-        // Delete associated image
-        if ($event->image) {
-            Storage::disk('public')->delete($event->image);
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return redirect()->route('login')
+                    ->with('error', 'Silakan login terlebih dahulu');
+            }
+            
+            $response = $this->api->withToken($token)->delete("events/{$id}");
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.events.index')
+                    ->with('success', 'Event berhasil dihapus!');
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal menghapus event');
+
+        } catch (\Exception $e) {
+            Log::error('Events destroy error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-
-        $event->delete();
-
-        return redirect()->route('admin.events.index')
-            ->with('success', 'Event deleted successfully!');
     }
 
     /**
      * Toggle event status
      */
-    public function toggleStatus(Event $event)
+    public function toggleStatus($id)
     {
-        $statuses = ['draft', 'published', 'cancelled', 'completed'];
-        $currentIndex = array_search($event->status, $statuses);
-        $nextIndex = ($currentIndex + 1) % count($statuses);
-        
-        $event->update(['status' => $statuses[$nextIndex]]);
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return redirect()->route('login')
+                    ->with('error', 'Silakan login terlebih dahulu');
+            }
+            
+            $eventResponse = $this->api->withToken($token)->get("events/{$id}");
+            $event = $eventResponse['data'] ?? null;
+            
+            if (!$event) {
+                return redirect()->back()
+                    ->with('error', 'Event tidak ditemukan');
+            }
+            
+            $currentStatus = $event['status'] ?? 'draft';
+            $newStatus = match($currentStatus) {
+                'draft' => 'published',
+                'published' => 'completed',
+                'completed' => 'cancelled',
+                'cancelled' => 'draft',
+                default => 'published'
+            };
+            
+            $updateData = [
+                'title' => $event['title'],
+                'description' => $event['description'],
+                'category_id' => $event['category_id'],
+                'start_date' => $event['start_date'],
+                'end_date' => $event['end_date'],
+                'location' => $event['location'],
+                'quota' => $event['quota'],
+                'price' => $event['price'],
+                'status' => $newStatus,
+            ];
+            
+            $response = $this->api->withToken($token)->put("events/{$id}", $updateData);
 
-        return redirect()->back()
-            ->with('success', "Event status changed to {$statuses[$nextIndex]}!");
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->back()
+                    ->with('success', "Status event berhasil diubah menjadi {$newStatus}!");
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal mengubah status');
+
+        } catch (\Exception $e) {
+            Log::error('Events toggle status error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     /**
      * Get event participants
      */
-    public function participants(Event $event)
+    public function participants($id)
     {
-        $participants = $event->participants()->with('user')->paginate(10);
-        return view('admin.events.participants', compact('event', 'participants'));
+        try {
+            $token = Session::get('api_token');
+            
+            $eventResponse = $this->api->withToken($token)->get("events/{$id}");
+            $eventData = $eventResponse['data'] ?? null;
+
+            if (!$eventData) {
+                return redirect()->route('admin.events.index')
+                    ->with('error', 'Event tidak ditemukan');
+            }
+
+            $event = $this->arrayToObject($eventData);
+
+            try {
+                $participantsResponse = $this->api->withToken($token)->get("events/{$id}/participants");
+                $participantsData = $participantsResponse['data']['data'] ?? $participantsResponse['data'] ?? [];
+            } catch (\Exception $e) {
+                $participantsData = [];
+            }
+            
+            $participants = array_map(fn($p) => (object) $p, $participantsData);
+
+            return view('admin.events.participants', compact('event', 'participants'));
+
+        } catch (\Exception $e) {
+            Log::error('Events participants error: ' . $e->getMessage());
+            return redirect()->route('admin.events.index')
+                ->with('error', 'Tidak dapat memuat data peserta');
+        }
+    }
+
+    /**
+     * Helper: Convert array to object recursively
+     */
+    private function arrayToObject($array)
+    {
+        if (!is_array($array)) {
+            return $array;
+        }
+
+        $object = new \stdClass();
+        foreach ($array as $key => $value) {
+            if (is_array($value)) {
+                $object->$key = $this->arrayToObject($value);
+            } else {
+                $object->$key = $value;
+            }
+        }
+        return $object;
     }
 }
-

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Reset Password - Event Connect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -39,20 +40,29 @@
                 @if($errors->any())
                     <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                         @foreach($errors->all() as $error)
-                            <p>{{ $error }}</p>
+                            <p class="text-sm">{{ $error }}</p>
                         @endforeach
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('password.update') }}" id="reset-form" class="mt-8 space-y-5">
+                <form method="POST" action="{{ route('password.update') }}" class="mt-8 space-y-5">
                     @csrf
-                    <input type="hidden" id="token" name="token" value="{{ request('token') }}">
-                    <input type="hidden" id="email" name="email" value="{{ request('email') }}">
+                    <input type="hidden" name="token" value="{{ $token }}">
+
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input id="email" name="email" type="email" value="{{ old('email', $email) }}" required readonly
+                               class="mt-2 block w-full rounded-lg border border-gray-200 px-3 py-2.5 bg-gray-50"
+                               placeholder="lorem@gmail.com">
+                        @error('email')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
 
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-700">Password Baru</label>
                         <input id="password" name="password" type="password" required
-                               class="mt-2 block w-full rounded-lg border border-gray-200 px-3 py-2.5"
+                               class="mt-2 block w-full rounded-lg border border-gray-200 px-3 py-2.5 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6]"
                                placeholder="••••••••">
                         @error('password')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -62,24 +72,15 @@
                     <div>
                         <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Konfirmasi Password</label>
                         <input id="password_confirmation" name="password_confirmation" type="password" required
-                               class="mt-2 block w-full rounded-lg border border-gray-200 px-3 py-2.5"
+                               class="mt-2 block w-full rounded-lg border border-gray-200 px-3 py-2.5 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6]"
                                placeholder="••••••••">
-                        @error('password_confirmation')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
                     </div>
 
                     <button type="submit"
-                            class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6]">
+                            class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6] hover:bg-[#ef9fa0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F4B6B6] shadow-sm transition">
                         Reset Password
                     </button>
                 </form>
-
-                @if(session('success'))
-                    <div class="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-                        {{ session('success') }}
-                    </div>
-                @endif
             </div>
         </div>
     </div>

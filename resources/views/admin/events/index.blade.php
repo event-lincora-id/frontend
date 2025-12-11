@@ -27,27 +27,43 @@
         </div>
     </div>
 
-    <!-- Search and Filter -->
-    <div class="px-6 py-4 border-b border-gray-200">
-        <div class="flex flex-col sm:flex-row gap-4">
-            <div class="flex-1">
-                <input type="text" placeholder="Search events..." class="admin-input w-full px-3 py-2 border border-gray-300 rounded-md">
-            </div>
-            <div class="flex gap-2">
-                <select class="admin-input px-3 py-2 border border-gray-300 rounded-md">
-                    <option value="">All Categories</option>
-                    <option value="1">Technology</option>
-                    <option value="2">Business</option>
-                    <option value="3">Education</option>
-                </select>
-                <select class="admin-input px-3 py-2 border border-gray-300 rounded-md">
-                    <option value="">All Status</option>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                </select>
+    @if(isset($error))
+        <div class="p-6">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {{ $error }}
             </div>
         </div>
+    @endif
+
+    <!-- Search and Filter -->
+    <div class="px-6 py-4 border-b border-gray-200">
+        <form method="GET" action="{{ route('admin.events.index') }}">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-1">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search events..." class="admin-input w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="flex gap-2">
+                    <select name="category_id" class="admin-input px-3 py-2 border border-gray-300 rounded-md">
+                        <option value="">All Categories</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}" {{ request('category_id') == $cat->id ? 'selected' : '' }}>
+                                {{ $cat->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <select name="status" class="admin-input px-3 py-2 border border-gray-300 rounded-md">
+                        <option value="">All Status</option>
+                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
+                        <option value="published" {{ request('status') == 'published' ? 'selected' : '' }}>Published</option>
+                        <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed</option>
+                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                    </select>
+                    <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- Events Table -->
@@ -56,7 +72,6 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organizer</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
@@ -70,7 +85,7 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-16 w-16">
-                                @if($event->image)
+                                @if(isset($event->image) && $event->image)
                                     <img class="h-16 w-16 rounded-lg object-cover" src="{{ $event->image }}" alt="{{ $event->title }}">
                                 @else
                                     <div class="h-16 w-16 rounded-lg bg-gray-300 flex items-center justify-center">
@@ -79,60 +94,60 @@
                                 @endif
                             </div>
                             <div class="ml-4">
-                                <div class="text-sm font-medium text-gray-900">{{ $event->title }}</div>
-                                <div class="text-sm text-gray-500">{{ \Illuminate\Support\Str::limit($event->description, 50) }}</div>
+                                <div class="text-sm font-medium text-gray-900">{{ $event->title ?? 'Untitled' }}</div>
+                                <div class="text-sm text-gray-500">{{ \Illuminate\Support\Str::limit($event->description ?? '', 50) }}</div>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm text-gray-900">{{ $event->organizer->name ?? 'Unknown' }}</div>
-                        <div class="text-sm text-gray-500">{{ $event->organizer->email ?? '' }}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            {{ $event->category->name ?? 'Uncategorized' }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>{{ \Carbon\Carbon::parse($event->start_date)->format('M d, Y') }}</div>
-                        <div class="text-gray-500">{{ \Carbon\Carbon::parse($event->start_date)->format('h:i A') }}</div>
+                        @if(isset($event->category))
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                {{ is_object($event->category) ? ($event->category->name ?? 'Uncategorized') : ($event->category['name'] ?? 'Uncategorized') }}
+                            </span>
+                        @else
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                Uncategorized
+                            </span>
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $event->participants_count ?? 0 }} / {{ $event->max_participants ?? '∞' }}
+                        @if(isset($event->start_date))
+                            <div>{{ \Carbon\Carbon::parse($event->start_date)->format('M d, Y') }}</div>
+                            <div class="text-gray-500">{{ \Carbon\Carbon::parse($event->start_date)->format('h:i A') }}</div>
+                        @else
+                            <div class="text-gray-500">No date</div>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ $event->participants_count ?? 0 }} / {{ $event->quota ?? '∞' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         @php
-                            $now = now();
-                            $startDate = \Carbon\Carbon::parse($event->start_date);
-                            $endDate = \Carbon\Carbon::parse($event->end_date);
-                            
-                            if ($now < $startDate) {
-                                $status = 'upcoming';
-                                $statusClass = 'bg-yellow-100 text-yellow-800';
-                            } elseif ($now >= $startDate && $now <= $endDate) {
-                                $status = 'ongoing';
-                                $statusClass = 'bg-green-100 text-green-800';
-                            } else {
-                                $status = 'completed';
-                                $statusClass = 'bg-gray-100 text-gray-800';
-                            }
+                            $eventStatus = $event->status ?? 'draft';
+                            $statusClasses = [
+                                'draft' => 'bg-gray-100 text-gray-800',
+                                'published' => 'bg-green-100 text-green-800',
+                                'completed' => 'bg-blue-100 text-blue-800',
+                                'cancelled' => 'bg-red-100 text-red-800',
+                            ];
+                            $statusClass = $statusClasses[$eventStatus] ?? 'bg-gray-100 text-gray-800';
                         @endphp
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusClass }}">
-                            {{ ucfirst($status) }}
+                            {{ ucfirst($eventStatus) }}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div class="flex space-x-2">
-                            <a href="{{ route('admin.events.show', $event) }}" style="color: var(--color-primary);" class="hover:opacity-80">
+                            <a href="{{ route('admin.events.show', $event->id) }}" style="color: var(--color-primary);" class="hover:opacity-80" title="View">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <a href="{{ route('admin.events.edit', $event) }}" class="text-gray-600 hover:text-gray-900">
+                            <a href="{{ route('admin.events.edit', $event->id) }}" class="text-gray-600 hover:text-gray-900" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="{{ route('admin.events.participants', $event) }}" class="text-green-600 hover:text-green-900">
+                            <a href="{{ route('admin.events.participants', $event->id) }}" class="text-green-600 hover:text-green-900" title="Participants">
                                 <i class="fas fa-users"></i>
                             </a>
-                            <button class="text-red-600 hover:text-red-900" onclick="confirmDelete({{ $event->id }})">
+                            <button class="text-red-600 hover:text-red-900" onclick="confirmDelete({{ $event->id }})" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -140,8 +155,13 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
-                        No events found
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                        <i class="fas fa-calendar-alt text-4xl mb-4 text-gray-400"></i>
+                        <div class="text-lg font-medium">No events found</div>
+                        <p class="mt-2">Create your first event to get started!</p>
+                        <a href="{{ route('admin.events.create') }}" style="background-color: var(--color-primary);" class="inline-block mt-4 text-white px-6 py-2 rounded-lg hover:opacity-90">
+                            <i class="fas fa-plus mr-2"></i>Create Event
+                        </a>
                     </td>
                 </tr>
                 @endforelse
@@ -158,7 +178,7 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -194,12 +214,19 @@
 @section('scripts')
 <script>
 function confirmDelete(eventId) {
-    document.getElementById('deleteForm').action = `/admin/events/${eventId}`;
+    document.getElementById('deleteForm').action = '/admin/events/' + eventId;
     document.getElementById('deleteModal').classList.remove('hidden');
 }
 
 function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
+
+// Close modal when clicking outside
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
 </script>
 @endsection

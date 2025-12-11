@@ -7,6 +7,7 @@
     <title>@yield('title', 'Event Connect')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    @stack('head-scripts')
 </head>
 <body class="bg-gray-100">
     <!-- Navigation -->
@@ -35,65 +36,65 @@
                        class="px-4 py-2 rounded-md text-sm font-medium {{ request()->routeIs('participant.dashboard') ? 'bg-red-700 text-white' : 'bg-white text-gray-900 hover:bg-gray-100' }}">
                         Participation
                     </a>
-                    @auth
+                    @if(session('user'))
                     <a href="{{ route('participant.bookmarks.index') }}" 
                     class="px-4 py-2 rounded-md text-sm font-medium {{ request()->routeIs('participant.bookmarks.*') ? 'bg-red-700 text-white' : 'bg-white text-gray-900 hover:bg-gray-100' }}">
                         Bookmarks
                     </a>
-                    @endauth
+                    @endif
                 </div>
                 
                 <!-- User Menu -->
                 <div class="flex items-center space-x-2">
-                    @auth
+                    @if(session('user'))
                         <span class="text-white text-sm font-medium mr-2">
-                            Welcome, {{ Auth::user()->full_name ?? Auth::user()->name }}
+                            Welcome, {{ session('user')['full_name'] ?? session('user')['name'] ?? session('user')['email'] }}
                         </span>
                         <div class="flex items-center space-x-2">
                             <!-- Notifications dengan badge -->
-<div class="relative">
-    <a href="{{ route('participant.notifications.index') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Notifikasi">
-        <i class="fas fa-bell text-sm"></i>
-        <span id="notification-badge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center hidden">
-            0
-        </span>
-    </a>
-</div>
-<script>
-// Load unread notification count
-async function loadNotificationCount() {
-    try {
-        const response = await fetch('/participant/notifications/unread-count');
-        const data = await response.json();
-        
-        if (data.success && data.count > 0) {
-            const badge = document.getElementById('notification-badge');
-            if (badge) {
-                badge.textContent = data.count > 99 ? '99+' : data.count;
-                badge.classList.remove('hidden');
-            }
-        }
-    } catch (error) {
-        console.error('Failed to load notification count:', error);
-    }
-}
+                            <div class="relative">
+                                <a href="{{ route('participant.notifications.index') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Notifikasi">
+                                    <i class="fas fa-bell text-sm"></i>
+                                    <span id="notification-badge" class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center hidden">
+                                        0
+                                    </span>
+                                </a>
+                            </div>
+                            <script>
+                            // Load unread notification count
+                            async function loadNotificationCount() {
+                                try {
+                                    const response = await fetch('/participant/notifications/unread-count');
+                                    const data = await response.json();
+                                    
+                                    if (data.success && data.count > 0) {
+                                        const badge = document.getElementById('notification-badge');
+                                        if (badge) {
+                                            badge.textContent = data.count > 99 ? '99+' : data.count;
+                                            badge.classList.remove('hidden');
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('Failed to load notification count:', error);
+                                }
+                            }
 
-// Load on page load
-document.addEventListener('DOMContentLoaded', loadNotificationCount);
+                            // Load on page load
+                            document.addEventListener('DOMContentLoaded', loadNotificationCount);
 
-// Refresh every 30 seconds
-setInterval(loadNotificationCount, 30000);
-</script>
+                            // Refresh every 30 seconds
+                            setInterval(loadNotificationCount, 30000);
+                            </script>
                             <!-- Guide shortcut -->
                             <a href="{{ route('guide') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Panduan">
                                 <i class="fas fa-book-open text-sm"></i>
                             </a>
                             <!-- Profile dropdown -->
-                            <div class="relative">
-                                <button class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center">
+                            <div class="relative" x-data="{ open: false }">
+                                <button @click="open = !open" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center">
                                     <i class="fas fa-user text-sm"></i>
                                 </button>
-                                <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden">
+                                <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                                     <a href="{{ route('participant.profile') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                         <i class="fas fa-user mr-2"></i>Profile
                                     </a>
@@ -107,7 +108,7 @@ setInterval(loadNotificationCount, 30000);
                             </div>
                         </div>
                     @else
-                <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2">
                             <a href="{{ route('guide') }}" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Panduan">
                                 <i class="fas fa-book-open text-sm"></i>
                             </a>
@@ -118,7 +119,7 @@ setInterval(loadNotificationCount, 30000);
                                 Register
                             </a>
                         </div>
-                    @endauth
+                    @endif
                 </div>
             </div>
         </div>
@@ -130,76 +131,38 @@ setInterval(loadNotificationCount, 30000);
     </main>
 
     <!-- Footer -->
-    <footer class="bg-[#4B0F0F] text-white py-8 mt-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer class="bg-gray-800 text-white mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
-                    <h3 class="text-lg font-semibold mb-4">Event Connect</h3>
-                    <p class="text-white/80">Discover and join amazing events in your area.</p>
+                    <h3 class="text-lg font-bold mb-4">Event Connect</h3>
+                    <p class="text-gray-400">Platform terbaik untuk menemukan dan mengelola event favoritmu.</p>
                 </div>
                 <div>
-                    <h4 class="text-md font-semibold mb-4">Quick Links</h4>
+                    <h3 class="text-lg font-bold mb-4">Quick Links</h3>
                     <ul class="space-y-2">
-                        <li><a href="{{ route('events.index') }}" class="text-white/80 hover:text-white">Browse Events</a></li>
-                        <li><a href="{{ route('guide') }}" class="text-white/80 hover:text-white">Panduan Pengguna</a></li>
-                        <li><a href="{{ route('login') }}" class="text-white/80 hover:text-white">Login Organizer</a></li>
+                        <li><a href="{{ route('home') }}" class="text-gray-400 hover:text-white">Home</a></li>
+                        <li><a href="{{ route('events.index') }}" class="text-gray-400 hover:text-white">Browse Events</a></li>
+                        <li><a href="{{ route('guide') }}" class="text-gray-400 hover:text-white">Panduan</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="text-md font-semibold mb-4">Support</h4>
+                    <h3 class="text-lg font-bold mb-4">Contact</h3>
                     <ul class="space-y-2">
-                        <li><a href="#" class="text-white/80 hover:text-white">Help Center</a></li>
-                        <li><a href="#" class="text-white/80 hover:text-white">Contact Us</a></li>
-                        <li><a href="#" class="text-white/80 hover:text-white">Privacy Policy</a></li>
+                        <li class="text-gray-400"><i class="fas fa-envelope mr-2"></i>info@eventconnect.com</li>
+                        <li class="text-gray-400"><i class="fas fa-phone mr-2"></i>+62 123 4567 890</li>
                     </ul>
-                </div>
-                <div>
-                    <h4 class="text-md font-semibold mb-4">Connect</h4>
-                    <div class="flex space-x-4">
-                        <a href="#" class="text-white/80 hover:text-white"><i class="fab fa-facebook text-xl"></i></a>
-                        <a href="#" class="text-white/80 hover:text-white"><i class="fab fa-twitter text-xl"></i></a>
-                        <a href="#" class="text-white/80 hover:text-white"><i class="fab fa-instagram text-xl"></i></a>
-                        <a href="#" class="text-white/80 hover:text-white"><i class="fab fa-linkedin text-xl"></i></a>
-                    </div>
                 </div>
             </div>
-            <div class="border-t border-white/20 mt-8 pt-8 text-center">
-                <p class="text-white/80">&copy; 2024 Event Connect. All rights reserved.</p>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; {{ date('Y') }} Event Connect. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
-    <!-- JavaScript -->
-    <script>
-        // Dropdown functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const dropdowns = document.querySelectorAll('.relative button');
-            dropdowns.forEach(dropdown => {
-                dropdown.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const menu = this.nextElementSibling;
-                    if (menu) {
-                        // Close all other dropdowns
-                        document.querySelectorAll('.relative .absolute').forEach(otherMenu => {
-                            if (otherMenu !== menu) {
-                                otherMenu.classList.add('hidden');
-                            }
-                        });
-                        // Toggle current dropdown
-                        menu.classList.toggle('hidden');
-                    }
-                });
-            });
+    <!-- Alpine.js for dropdown -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-            // Close dropdowns when clicking outside
-            document.addEventListener('click', function() {
-                document.querySelectorAll('.relative .absolute').forEach(menu => {
-                    menu.classList.add('hidden');
-                });
-            });
-        });
-    </script>
-
-    @yield('scripts')
+    @stack('scripts')
 </body>
 </html>

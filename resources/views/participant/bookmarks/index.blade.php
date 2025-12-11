@@ -2,6 +2,13 @@
 
 @section('title', 'My Bookmarks - Event Connect')
 
+@push('head-scripts')
+<script>
+// Load all events data for bookmarks
+window.allEventsData = @json($allEvents ?? []);
+</script>
+@endpush
+
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
@@ -14,213 +21,209 @@
     <div class="bg-white rounded-lg shadow-sm mb-6">
         <div class="border-b border-gray-200">
             <nav class="flex -mb-px space-x-8 px-6">
-                <a href="?filter=all" class="filter-tab {{ (!request('filter') || request('filter') == 'all') ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                <a href="#" data-filter="all" class="filter-tab border-red-600 text-red-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                     Semua
-                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs {{ (!request('filter') || request('filter') == 'all') ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $counts['all'] }}
-                    </span>
+                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-red-100 text-red-600" id="count-all">0</span>
                 </a>
-                <a href="?filter=upcoming" class="filter-tab {{ request('filter') == 'upcoming' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                <a href="#" data-filter="upcoming" class="filter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                     Upcoming
-                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs {{ request('filter') == 'upcoming' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $counts['upcoming'] }}
-                    </span>
+                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600" id="count-upcoming">0</span>
                 </a>
-                <a href="?category=saved" class="filter-tab {{ request('category') == 'saved' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                    Saved
-                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs {{ request('category') == 'saved' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $counts['saved'] }}
-                    </span>
-                </a>
-                <a href="?category=interested" class="filter-tab {{ request('category') == 'interested' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-                    Interested
-                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs {{ request('category') == 'interested' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $counts['interested'] }}
-                    </span>
-                </a>
-                <a href="?filter=past" class="filter-tab {{ request('filter') == 'past' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                <a href="#" data-filter="past" class="filter-tab border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                     Past
-                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs {{ request('filter') == 'past' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600' }}">
-                        {{ $counts['past'] }}
-                    </span>
+                    <span class="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600" id="count-past">0</span>
                 </a>
             </nav>
         </div>
     </div>
 
     <!-- Bookmarked Events Grid -->
-    @if($bookmarks->count() > 0)
+    <div id="bookmarks-container">
+        <!-- Will be populated by JavaScript -->
+    </div>
+    
+    <!-- Empty State (initially hidden) -->
+    <div id="empty-state" class="bg-white rounded-lg shadow-sm p-12 text-center hidden">
+        <i class="fas fa-bookmark text-6xl text-gray-300 mb-4"></i>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Belum Ada Bookmark</h3>
+        <p class="text-gray-600 mb-6">Anda belum menyimpan event apapun. Mulai explore dan bookmark event favorit Anda!</p>
+        <a href="{{ route('events.index') }}" class="inline-block bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition font-medium">
+            <i class="fas fa-search mr-2"></i>
+            Explore Events
+        </a>
+    </div>
+</div>
+
+<script>
+// Bookmark Manager - localStorage ONLY
+const BookmarkManager = {
+    STORAGE_KEY: 'event_bookmarks',
+    
+    getBookmarks() {
+        const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+        return bookmarks ? JSON.parse(bookmarks) : [];
+    },
+    
+    remove(eventId) {
+        const bookmarks = this.getBookmarks();
+        const filtered = bookmarks.filter(id => id !== eventId);
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
+        return filtered;
+    }
+};
+
+// Render bookmarked events
+function renderBookmarks(filter = 'all') {
+    const bookmarkedIds = BookmarkManager.getBookmarks();
+    const allEvents = window.allEventsData || [];
+    const container = document.getElementById('bookmarks-container');
+    const emptyState = document.getElementById('empty-state');
+    
+    // Filter events by bookmark IDs
+    let bookmarkedEvents = allEvents.filter(event => bookmarkedIds.includes(event.id));
+    
+    // Apply filter
+    const now = new Date();
+    if (filter === 'upcoming') {
+        bookmarkedEvents = bookmarkedEvents.filter(event => new Date(event.start_date) > now);
+    } else if (filter === 'past') {
+        bookmarkedEvents = bookmarkedEvents.filter(event => new Date(event.end_date || event.start_date) < now);
+    }
+    
+    // Update counts
+    const upcomingCount = allEvents.filter(e => bookmarkedIds.includes(e.id) && new Date(e.start_date) > now).length;
+    const pastCount = allEvents.filter(e => bookmarkedIds.includes(e.id) && new Date(e.end_date || e.start_date) < now).length;
+    
+    document.getElementById('count-all').textContent = bookmarkedIds.length;
+    document.getElementById('count-upcoming').textContent = upcomingCount;
+    document.getElementById('count-past').textContent = pastCount;
+    
+    // Show/hide empty state
+    if (bookmarkedEvents.length === 0) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    emptyState.classList.add('hidden');
+    
+    // Render events
+    container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @foreach($bookmarks as $bookmark)
-                @php
-                    $event = $bookmark->event;
-                @endphp
+            ${bookmarkedEvents.map(event => `
                 <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                    <!-- Event Image -->
                     <div class="relative h-48 bg-gradient-to-r from-red-500 to-red-600">
-                        @if($event->image)
-                            <img src="{{ asset('storage/' . $event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
-                        @else
-                            <div class="flex items-center justify-center h-full">
+                        ${event.image_url ? 
+                            `<img src="${event.image_url}" alt="${event.title}" class="w-full h-full object-cover">` :
+                            `<div class="flex items-center justify-center h-full">
                                 <i class="fas fa-calendar-alt text-white text-6xl opacity-50"></i>
-                            </div>
-                        @endif
-                        
-                        <!-- Bookmark Badge -->
+                            </div>`
+                        }
                         <div class="absolute top-3 right-3">
-                            <button onclick="removeBookmark({{ $event->id }}, this)" class="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition shadow-lg" title="Remove bookmark">
+                            <button onclick="removeBookmark(${event.id})" class="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition shadow-lg" title="Remove bookmark">
                                 <i class="fas fa-bookmark"></i>
                             </button>
                         </div>
-
-                        <!-- Category Badge -->
-                        @if($event->category)
-                        <div class="absolute top-3 left-3">
-                            <span class="px-3 py-1 bg-white text-gray-900 text-xs font-semibold rounded-full">
-                                {{ $event->category->name }}
-                            </span>
-                        </div>
-                        @endif
+                        ${event.category_name ? 
+                            `<div class="absolute top-3 left-3">
+                                <span class="px-3 py-1 bg-white text-gray-900 text-xs font-semibold rounded-full">
+                                    ${event.category_name}
+                                </span>
+                            </div>` : ''
+                        }
                     </div>
-
-                    <!-- Event Details -->
                     <div class="p-5">
                         <h3 class="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-                            <a href="{{ route('events.show', $event->id) }}" class="hover:text-red-600">
-                                {{ $event->title }}
+                            <a href="/events/${event.id}" class="hover:text-red-600">
+                                ${event.title}
                             </a>
                         </h3>
-
-                        <!-- Organizer -->
-                        <div class="flex items-center text-sm text-gray-600 mb-3">
-                            <i class="far fa-user mr-2"></i>
-                            <span>{{ $event->organizer->full_name ?? $event->organizer->name }}</span>
-                        </div>
-
-                        <!-- Date & Time -->
                         <div class="flex items-center text-sm text-gray-600 mb-2">
                             <i class="far fa-calendar mr-2"></i>
-                            <span>{{ $event->start_date->format('d M Y') }}</span>
+                            <span>${new Date(event.start_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}</span>
                         </div>
-
-                        <!-- Location -->
                         <div class="flex items-center text-sm text-gray-600 mb-3">
                             <i class="fas fa-map-marker-alt mr-2"></i>
-                            <span class="line-clamp-1">{{ $event->location }}</span>
+                            <span class="line-clamp-1">${event.location}</span>
                         </div>
-
-                        <!-- Bookmark Info -->
-                        <div class="border-t pt-3 mb-3">
-                            <div class="flex items-center justify-between text-xs text-gray-500">
-                                <span class="flex items-center">
-                                    <i class="fas fa-tag mr-1"></i>
-                                    {{ ucfirst($bookmark->category) }}
-                                </span>
-                                <span>{{ $bookmark->created_at->diffForHumans() }}</span>
-                            </div>
-                            @if($bookmark->notes)
-                            <p class="mt-2 text-sm text-gray-600 italic line-clamp-2">
-                                "{{ $bookmark->notes }}"
-                            </p>
-                            @endif
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex gap-2">
-                            <a href="{{ route('events.show', $event->id) }}" class="flex-1 bg-red-600 text-white text-center py-2 rounded-lg hover:bg-red-700 transition font-medium">
+                        <div class="flex gap-2 mt-4">
+                            <a href="/events/${event.id}" class="flex-1 bg-red-600 text-white text-center py-2 rounded-lg hover:bg-red-700 transition font-medium">
                                 View Details
                             </a>
-                            @if($event->is_paid)
-                            <div class="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-semibold">
-                                Rp {{ number_format($event->price, 0, ',', '.') }}
-                            </div>
-                            @else
-                            <div class="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg font-semibold">
-                                Free
-                            </div>
-                            @endif
+                            ${event.price > 0 ?
+                                `<div class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg font-semibold text-sm">
+                                    Rp ${Number(event.price).toLocaleString('id-ID')}
+                                </div>` :
+                                `<div class="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-semibold text-sm">
+                                    FREE
+                                </div>`
+                            }
                         </div>
                     </div>
                 </div>
-            @endforeach
+            `).join('')}
         </div>
+    `;
+}
 
-        <!-- Pagination -->
-        @if($bookmarks->hasPages())
-        <div class="mt-8">
-            {{ $bookmarks->links() }}
-        </div>
-        @endif
-    @else
-        <!-- Empty State -->
-        <div class="bg-white rounded-lg shadow-sm p-12 text-center">
-            <i class="fas fa-bookmark text-6xl text-gray-300 mb-4"></i>
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">Belum Ada Bookmark</h3>
-            <p class="text-gray-600 mb-6">Anda belum menyimpan event apapun. Mulai explore dan bookmark event favorit Anda!</p>
-            <a href="{{ route('events.index') }}" class="inline-block bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition font-medium">
-                <i class="fas fa-search mr-2"></i>
-                Explore Events
-            </a>
-        </div>
-    @endif
-</div>
+function removeBookmark(eventId) {
+    if (!confirm('Remove this bookmark?')) return;
+    
+    BookmarkManager.remove(eventId);
+    renderBookmarks(currentFilter);
+    showToast('Bookmark removed', 'info');
+}
 
-<!-- JavaScript -->
-<script>
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+function showToast(message, type = 'info') {
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        info: 'bg-blue-500'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
 
-    async function removeBookmark(eventId, button) {
-        if (!confirm('Remove this bookmark?')) return;
+// Filter handling
+let currentFilter = 'all';
 
-        try {
-            const response = await fetch(`/participant/bookmarks/${eventId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                }
-            });
+document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        currentFilter = tab.dataset.filter;
+        
+        // Update active tab
+        document.querySelectorAll('.filter-tab').forEach(t => {
+            t.classList.remove('border-red-600', 'text-red-600');
+            t.classList.add('border-transparent', 'text-gray-500');
+            t.querySelector('span').classList.remove('bg-red-100', 'text-red-600');
+            t.querySelector('span').classList.add('bg-gray-100', 'text-gray-600');
+        });
+        
+        tab.classList.remove('border-transparent', 'text-gray-500');
+        tab.classList.add('border-red-600', 'text-red-600');
+        tab.querySelector('span').classList.remove('bg-gray-100', 'text-gray-600');
+        tab.querySelector('span').classList.add('bg-red-100', 'text-red-600');
+        
+        renderBookmarks(currentFilter);
+    });
+});
 
-            const data = await response.json();
-
-            if (data.success) {
-                // Remove the card with animation
-                const card = button.closest('.grid > div');
-                card.style.transition = 'opacity 0.3s';
-                card.style.opacity = '0';
-                setTimeout(() => {
-                    card.remove();
-                    
-                    // Check if no more bookmarks
-                    const grid = document.querySelector('.grid');
-                    if (grid && grid.children.length === 0) {
-                        location.reload();
-                    }
-                }, 300);
-
-                showToast('Bookmark removed successfully', 'success');
-            } else {
-                showToast(data.message || 'Failed to remove bookmark', 'error');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            showToast('Failed to remove bookmark', 'error');
-        }
-    }
-
-    function showToast(message, type = 'success') {
-        const toast = document.createElement('div');
-        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-600' : 'bg-red-600'
-        }`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.transition = 'opacity 0.3s';
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
+// Initial render
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Loading bookmarks...', window.allEventsData);
+    renderBookmarks('all');
+});
 </script>
 @endsection

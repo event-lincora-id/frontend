@@ -2,271 +2,147 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Event;
-use App\Models\Category;
-use App\Models\EventParticipant;
-use App\Models\Feedback;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Services\BackendApiService;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 
 class AnalyticsController extends Controller
 {
-    public function __construct()
+    protected BackendApiService $api;
+
+    public function __construct(BackendApiService $api)
     {
-        // Role validation is handled by middleware in routes
+        $this->api = $api;
     }
 
-    /**
-     * Display analytics dashboard
-     */
     public function index(Request $request)
     {
-        $dateRange = $request->get('date_range', '30'); // Default to last 30 days
-        $startDate = Carbon::now()->subDays($dateRange);
-        $endDate = Carbon::now();
+        try {
+            $token = Session::get('api_token');
 
-        // Basic statistics
-        $stats = $this->getBasicStats($startDate, $endDate);
-        
-        // User analytics
-        $userAnalytics = $this->getUserAnalytics($startDate, $endDate);
-        
-        // Event analytics
-        $eventAnalytics = $this->getEventAnalytics($startDate, $endDate);
-        
-        // Revenue analytics
-        $revenueAnalytics = $this->getRevenueAnalytics($startDate, $endDate);
-        
-        // Category analytics
-        $categoryAnalytics = $this->getCategoryAnalytics($startDate, $endDate);
-        
-        // Monthly trends
-        $monthlyTrends = $this->getMonthlyTrends();
-        
-        // Top events
-        $topEvents = $this->getTopEvents($startDate, $endDate);
+            if (!$token) {
+                return redirect()->route('login');
+            }
 
-        return view('admin.analytics', compact(
-            'stats',
-            'userAnalytics',
-            'eventAnalytics',
-            'revenueAnalytics',
-            'categoryAnalytics',
-            'monthlyTrends',
-            'topEvents',
-            'dateRange'
-        ));
-    }
-
-    /**
-     * Get basic statistics
-     */
-    private function getBasicStats($startDate, $endDate)
-    {
-        return [
-            'total_users' => User::count(),
-            'new_users' => User::where('created_at', '>=', $startDate)->count(),
-            'total_events' => Event::count(),
-            'active_events' => Event::where('status', 'published')->count(),
-            'total_participants' => EventParticipant::count(),
-            'total_revenue' => Event::sum('price'),
-            'avg_rating' => Feedback::avg('rating') ?? 0,
-        ];
-    }
-
-    /**
-     * Get user analytics
-     */
-    private function getUserAnalytics($startDate, $endDate)
-    {
-        // User registration trends
-        $userTrends = User::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('COUNT(*) as count')
-        )
-        ->where('created_at', '>=', $startDate)
-        ->groupBy('date')
-        ->orderBy('date')
-        ->get();
-
-        // User roles distribution
-        $roleDistribution = User::select('role', DB::raw('COUNT(*) as count'))
-            ->groupBy('role')
-            ->get();
-
-        // Organizer statistics
-        $organizerStats = User::where('role', 'admin') // Admin = Event Organizer
-            ->withCount('events')
-            ->get();
-        
-        $totalOrganizers = $organizerStats->count();
-        $avgEventsPerOrganizer = $organizerStats->avg('events_count');
-        
-        $organizerStats = (object) [
-            'total_organizers' => $totalOrganizers,
-            'avg_events_per_organizer' => $avgEventsPerOrganizer
-        ];
-
-        return [
-            'user_trends' => $userTrends,
-            'role_distribution' => $roleDistribution,
-            'organizer_stats' => $organizerStats,
-        ];
-    }
-
-    /**
-     * Get event analytics
-     */
-    private function getEventAnalytics($startDate, $endDate)
-    {
-        // Event creation trends
-        $eventTrends = Event::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('COUNT(*) as count')
-        )
-        ->where('created_at', '>=', $startDate)
-        ->groupBy('date')
-        ->orderBy('date')
-        ->get();
-
-        // Event status distribution
-        $statusDistribution = Event::select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->get();
-
-        // Events by month
-        $monthlyEvents = Event::select(
-            DB::raw('YEAR(start_date) as year'),
-            DB::raw('MONTH(start_date) as month'),
-            DB::raw('COUNT(*) as count')
-        )
-        ->where('start_date', '>=', $startDate)
-        ->groupBy('year', 'month')
-        ->orderBy('year')
-        ->orderBy('month')
-        ->get();
-
-        return [
-            'event_trends' => $eventTrends,
-            'status_distribution' => $statusDistribution,
-            'monthly_events' => $monthlyEvents,
-        ];
-    }
-
-    /**
-     * Get revenue analytics
-     */
-    private function getRevenueAnalytics($startDate, $endDate)
-    {
-        // Revenue trends
-        $revenueTrends = Event::select(
-            DB::raw('DATE(start_date) as date'),
-            DB::raw('SUM(price) as revenue')
-        )
-        ->where('start_date', '>=', $startDate)
-        ->where('status', 'published')
-        ->groupBy('date')
-        ->orderBy('date')
-        ->get();
-
-        // Revenue by category
-        $revenueByCategory = Event::join('categories', 'events.category_id', '=', 'categories.id')
-            ->select(
-                'categories.name as category_name',
-                DB::raw('SUM(events.price) as revenue')
-            )
-            ->where('events.start_date', '>=', $startDate)
-            ->where('events.status', 'published')
-            ->groupBy('categories.id', 'categories.name')
-            ->orderBy('revenue', 'desc')
-            ->get();
-
-        return [
-            'revenue_trends' => $revenueTrends,
-            'revenue_by_category' => $revenueByCategory,
-        ];
-    }
-
-    /**
-     * Get category analytics
-     */
-    private function getCategoryAnalytics($startDate, $endDate)
-    {
-        return Category::withCount(['events' => function($query) use ($startDate, $endDate) {
-            $query->where('start_date', '>=', $startDate);
-        }])
-        ->withCount(['events as active_events_count' => function($query) {
-            $query->where('status', 'published');
-        }])
-        ->orderBy('events_count', 'desc')
-        ->get();
-    }
-
-    /**
-     * Get monthly trends
-     */
-    private function getMonthlyTrends()
-    {
-        $months = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $date = Carbon::now()->subMonths($i);
-            $months[] = [
-                'month' => $date->format('M Y'),
-                'users' => User::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->count(),
-                'events' => Event::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->count(),
+            $params = [
+                'date_range' => $request->get('date_range', '30'),
             ];
+
+            // Try to get analytics from API
+            try {
+                $response = $this->api->withToken($token)->get('admin/analytics', $params);
+                $analytics = $response['data'] ?? [];
+            } catch (\Exception $e) {
+                // If API endpoint doesn't exist, use fallback data
+                Log::warning('Analytics API not available, using fallback data');
+                $analytics = [];
+            }
+
+            // Prepare data for view with fallback defaults
+            $monthlyData = [
+                'total_events' => $analytics['stats']['total_events'] ?? 0,
+                'total_participants' => $analytics['stats']['total_participants'] ?? 0,
+                'active_events' => $analytics['stats']['active_events'] ?? 0,
+                'avg_attendance' => $analytics['stats']['avg_attendance'] ?? 0,
+                'top_events' => $analytics['top_events'] ?? [],
+            ];
+
+            $categoryStats = $analytics['category_stats'] ?? [];
+            
+            // Get events and categories for fallback calculation
+            if (empty($categoryStats)) {
+                try {
+                    $categoriesResponse = $this->api->get('categories');
+                    $categories = $categoriesResponse['data'] ?? [];
+                    
+                    $categoryStats = array_map(function($cat) {
+                        return [
+                            'name' => $cat['name'] ?? 'Unknown',
+                            'count' => 0,
+                            'percentage' => 0,
+                            'color' => $cat['color'] ?? '#3B82F6'
+                        ];
+                    }, $categories);
+                } catch (\Exception $e) {
+                    $categoryStats = [];
+                }
+            }
+
+            $chartData = [
+                'labels' => $analytics['chart_labels'] ?? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                'events' => $analytics['chart_events'] ?? array_fill(0, 12, 0),
+                'users' => $analytics['chart_users'] ?? array_fill(0, 12, 0),
+            ];
+
+            return view('admin.analytics.index', compact('monthlyData', 'categoryStats', 'chartData'));
+
+        } catch (\Exception $e) {
+            Log::error('Analytics index error: ' . $e->getMessage());
+            
+            // Return view with empty data
+            $monthlyData = [
+                'total_events' => 0,
+                'total_participants' => 0,
+                'active_events' => 0,
+                'avg_attendance' => 0,
+                'top_events' => [],
+            ];
+            
+            $categoryStats = [];
+            
+            $chartData = [
+                'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                'events' => array_fill(0, 12, 0),
+                'users' => array_fill(0, 12, 0),
+            ];
+            
+            return view('admin.analytics.index', [
+                'monthlyData' => $monthlyData,
+                'categoryStats' => $categoryStats,
+                'chartData' => $chartData,
+                'error' => 'Tidak dapat memuat data analytics: ' . $e->getMessage()
+            ]);
         }
-        return $months;
     }
 
-    /**
-     * Get top events
-     */
-    private function getTopEvents($startDate, $endDate)
-    {
-        return Event::withCount('participants')
-            ->where('start_date', '>=', $startDate)
-            ->orderBy('participants_count', 'desc')
-            ->limit(10)
-            ->get();
-    }
-
-    /**
-     * Export analytics data
-     */
     public function export(Request $request)
     {
-        $format = $request->get('format', 'csv');
-        $dateRange = $request->get('date_range', '30');
-        
-        // Implementation for exporting analytics data
-        // This would generate CSV/Excel files with analytics data
-        
-        return response()->json(['message' => 'Export functionality to be implemented']);
+        try {
+            $token = Session::get('api_token');
+
+            $params = [
+                'format' => $request->get('format', 'csv'),
+                'date_range' => $request->get('date_range', '30'),
+            ];
+
+            $response = $this->api->withToken($token)->get('admin/analytics/export', $params);
+
+            if (isset($response['data']['download_url'])) {
+                return redirect($response['data']['download_url']);
+            }
+
+            return redirect()->back()
+                ->with('error', 'Export gagal');
+
+        } catch (\Exception $e) {
+            Log::error('Analytics export error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
-    /**
-     * Get real-time analytics
-     */
-    public function realtime()
+    public function realtime(Request $request)
     {
-        $stats = [
-            'online_users' => rand(10, 50), // Mock data
-            'active_events' => Event::where('status', 'published')
-                ->where('start_date', '<=', now())
-                ->where('end_date', '>=', now())
-                ->count(),
-            'today_registrations' => User::whereDate('created_at', today())->count(),
-            'today_events' => Event::whereDate('created_at', today())->count(),
-        ];
+        try {
+            $token = Session::get('api_token');
+            $response = $this->api->withToken($token)->get('admin/analytics/realtime');
+            
+            return response()->json($response['data'] ?? []);
 
-        return response()->json($stats);
+        } catch (\Exception $e) {
+            Log::error('Analytics realtime error: ' . $e->getMessage());
+            return response()->json(['error' => 'Tidak dapat memuat data realtime'], 500);
+        }
     }
 }
-

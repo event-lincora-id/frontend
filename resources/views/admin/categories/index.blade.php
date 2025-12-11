@@ -16,6 +16,14 @@
         </div>
     </div>
 
+    @if(isset($error))
+        <div class="p-6">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {{ $error }}
+            </div>
+        </div>
+    @endif
+
     <!-- Categories Grid -->
     <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -27,7 +35,7 @@
                         <h4 class="text-lg font-medium text-gray-900">{{ $category->name }}</h4>
                     </div>
                     <div class="flex space-x-2">
-                        <button onclick="openEditModal({{ $category->id }}, '{{ addslashes($category->name) }}', '{{ $category->color ?? '#3B82F6' }}')" class="text-indigo-600 hover:text-indigo-900">
+                        <button onclick="openEditModal({{ $category->id }}, '{{ addslashes($category->name) }}', '{{ addslashes($category->description ?? '') }}', '{{ $category->color ?? '#3B82F6' }}')" class="text-indigo-600 hover:text-indigo-900">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button onclick="confirmDelete({{ $category->id }})" class="text-red-600 hover:text-red-900">
@@ -69,7 +77,7 @@
 </div>
 
 <!-- Add/Edit Category Modal -->
-<div id="categoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+<div id="categoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             <form id="categoryForm" method="POST">
@@ -95,14 +103,9 @@
                                 <div>
                                     <label for="color" class="block text-sm font-medium text-gray-700">Color</label>
                                     <div class="mt-1 flex items-center">
-                                        <input type="color" name="color" id="color" value="#B22234" class="admin-input h-10 w-16 border-gray-300 rounded-md shadow-sm">
+                                        <input type="color" name="color" id="color" value="#3B82F6" class="admin-input h-10 w-16 border-gray-300 rounded-md shadow-sm">
                                         <span class="ml-3 text-sm text-gray-500">Choose a color for this category</span>
                                     </div>
-                                </div>
-                                
-                                <div class="flex items-center">
-                                    <input type="checkbox" name="is_active" id="is_active" value="1" checked style="accent-color: var(--color-primary);" class="h-4 w-4 border-gray-300 rounded">
-                                    <label for="is_active" class="ml-2 block text-sm text-gray-900">Active</label>
                                 </div>
                             </div>
                         </div>
@@ -123,7 +126,7 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+<div id="deleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
     <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
             <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -154,6 +157,7 @@
         </div>
     </div>
 </div>
+
 @endsection
 
 @section('scripts')
@@ -164,16 +168,16 @@ function openAddModal() {
     document.getElementById('methodField').innerHTML = '';
     document.getElementById('name').value = '';
     document.getElementById('description').value = '';
-    document.getElementById('color').value = '#B22234';
-    document.getElementById('is_active').checked = true;
+    document.getElementById('color').value = '#3B82F6';
     document.getElementById('categoryModal').classList.remove('hidden');
 }
 
-function openEditModal(id, name, color) {
+function openEditModal(id, name, description, color) {
     document.getElementById('modalTitle').textContent = 'Edit Category';
-    document.getElementById('categoryForm').action = `/admin/categories/${id}`;
+    document.getElementById('categoryForm').action = '/admin/categories/' + id;
     document.getElementById('methodField').innerHTML = '@method("PUT")';
     document.getElementById('name').value = name;
+    document.getElementById('description').value = description;
     document.getElementById('color').value = color;
     document.getElementById('categoryModal').classList.remove('hidden');
 }
@@ -182,13 +186,26 @@ function closeCategoryModal() {
     document.getElementById('categoryModal').classList.add('hidden');
 }
 
-function confirmDelete(categoryId) {
-    document.getElementById('deleteForm').action = `/admin/categories/${categoryId}`;
+function confirmDelete(id) {
+    document.getElementById('deleteForm').action = '/admin/categories/' + id;
     document.getElementById('deleteModal').classList.remove('hidden');
 }
 
 function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
+
+// Close modals when clicking outside
+document.getElementById('categoryModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCategoryModal();
+    }
+});
+
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
 </script>
 @endsection

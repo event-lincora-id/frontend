@@ -3,55 +3,89 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\User;
-use App\Models\Event;
-use App\Models\Category;
-use App\Models\EventParticipant;
-use App\Models\Feedback;
-use App\Models\Notification;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use App\Services\BackendApiService;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class AdminDashboardController extends Controller
 {
-    public function __construct()
+    protected BackendApiService $api;
+
+    public function __construct(BackendApiService $api)
     {
-        // Role validation is handled by middleware in routes
+        $this->api = $api;
     }
+
     public function index()
     {
-        // If super admin, direct to organizers listing (admin users)
-        if (auth()->check() && method_exists(auth()->user(), 'isSuperAdmin') && auth()->user()->isSuperAdmin()) {
-            return redirect()->route('admin.users.index');
-        }
+        try {
+            $token = Session::get('api_token');
+            $user = Session::get('user');
 
-        // Get basic statistics
-        $stats = $this->getDashboardStats();
-        
-        // Get recent activities
-        $recentActivities = $this->getRecentActivities();
-        
-        // Get monthly event data for chart
-        $monthlyEvents = $this->getMonthlyEventData();
-        
-        // Get category distribution
-        $categoryStats = $this->getCategoryStats();
-        
-        // Get user registration trends
-        $userTrends = $this->getUserTrends();
-        
-        // Get top events by participants
-        $topEvents = $this->getTopEvents();
-        
-        return view('admin.dashboard', compact(
-            'stats', 
-            'recentActivities', 
-            'monthlyEvents', 
-            'categoryStats', 
-            'userTrends', 
-            'topEvents'
-        ));
+            if (!$token || !$user) {
+                return redirect()->route('login');
+            }
+
+            // Check if super admin - redirect to users list
+            if (isset($user['role']) && $user['role'] === 'super_admin') {
+                return redirect()->route('admin.users.index');
+            }
+
+            // Get dashboard stats from API
+            $stats = $this->getDashboardStats($token);
+            
+            // Get recent activities
+            $recentActivities = $this->getRecentActivities($token);
+            
+            // Get monthly event data
+            $monthlyEvents = $this->getMonthlyEventData($token);
+            
+            // Get category stats
+            $categoryStats = $this->getCategoryStats($token);
+            
+            // Get user trends (simplified)
+            $userTrends = [];
+            
+            // Get top events
+            $topEvents = $this->getTopEvents($token);
+            
+            return view('admin.dashboard', compact(
+                'stats', 
+                'recentActivities', 
+                'monthlyEvents', 
+                'categoryStats', 
+                'userTrends', 
+                'topEvents'
+            ));
+        } catch (\Exception $e) {
+            Log::error('Admin Dashboard error: ' . $e->getMessage());
+            
+            // Return view with empty data
+            return view('admin.dashboard', [
+                'stats' => [
+                    'total_users' => 0,
+                    'total_events' => 0,
+                    'total_categories' => 0,
+                    'total_participants' => 0,
+                    'total_feedbacks' => 0,
+                    'active_events' => 0,
+                    'completed_events' => 0,
+                    'organizers' => 0,
+                    'this_month_events' => 0,
+                    'this_month_participants' => 0,
+                ],
+                'recentActivities' => [],
+                'monthlyEvents' => [
+                    'months' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    'events' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                ],
+                'categoryStats' => collect([]),
+                'userTrends' => [],
+                'topEvents' => [],
+                'error' => 'Tidak dapat memuat data dashboard'
+            ]);
+        }
     }
 
     public function users()
@@ -74,143 +108,147 @@ class AdminDashboardController extends Controller
         return redirect()->route('admin.analytics');
     }
     
-    private function getDashboardStats()
+    private function getDashboardStats($token)
     {
-        $organizerId = auth()->id();
-        
-        // Get organizer's events
-        $organizerEvents = Event::where('user_id', $organizerId);
-        
-        // Get participants from organizer's events
-        $eventIds = $organizerEvents->pluck('id');
-        $participants = EventParticipant::whereIn('event_id', $eventIds);
-        
-        return [
-            'total_users' => $participants->distinct('user_id')->count(), // Users who joined organizer's events
-            'total_events' => $organizerEvents->count(),
-            'total_categories' => Category::count(), // Categories are global
-            'total_participants' => $participants->count(),
-            'total_feedbacks' => Feedback::whereIn('event_id', $eventIds)->count(),
-            'active_events' => $organizerEvents->where('start_date', '>', now())->count(),
-            'completed_events' => $organizerEvents->where('end_date', '<', now())->count(),
-            'organizers' => 1, // Current organizer only
-            'this_month_events' => $organizerEvents->whereMonth('created_at', now()->month)->count(),
-            'this_month_participants' => $participants->whereMonth('created_at', now()->month)->count(),
-        ];
-    }
-    
-    private function getRecentActivities()
-    {
-        $organizerId = auth()->id();
-        $activities = collect();
-        
-        // Get organizer's events
-        $organizerEvents = Event::where('user_id', $organizerId);
-        $eventIds = $organizerEvents->pluck('id');
-        
-        // Recent participants who joined organizer's events
-        $recentParticipants = EventParticipant::with('user', 'event')
-            ->whereIn('event_id', $eventIds)
-            ->latest()
-            ->take(5)
-            ->get();
-        foreach ($recentParticipants as $participant) {
-            $activities->push([
-                'type' => 'user_joined',
-                'message' => "User {$participant->user->full_name} joined '{$participant->event->title}'",
-                'time' => $participant->created_at,
-                'icon' => 'user-plus',
-                'color' => 'green'
-            ]);
-        }
-        
-        // Recent events created by organizer
-        $recentEvents = $organizerEvents->latest()->take(5)->get();
-        foreach ($recentEvents as $event) {
-            $activities->push([
-                'type' => 'event_created',
-                'message' => "Event '{$event->title}' created",
-                'time' => $event->created_at,
-                'icon' => 'calendar-plus',
-                'color' => 'blue'
-            ]);
-        }
-        
-        // Recent feedbacks on organizer's events
-        $recentFeedbacks = Feedback::with('user', 'event')
-            ->whereIn('event_id', $eventIds)
-            ->latest()
-            ->take(5)
-            ->get();
-        foreach ($recentFeedbacks as $feedback) {
-            $activities->push([
-                'type' => 'feedback_submitted',
-                'message' => "Feedback submitted for '{$feedback->event->title}' by {$feedback->user->full_name}",
-                'time' => $feedback->created_at,
-                'icon' => 'message-square',
-                'color' => 'yellow'
-            ]);
-        }
-        
-        return $activities->sortByDesc('time')->take(10);
-    }
-    
-    private function getMonthlyEventData()
-    {
-        $months = [];
-        $eventCounts = [];
-        
-        for ($i = 11; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
-            $months[] = $date->format('M Y');
-            $eventCounts[] = Event::whereYear('created_at', $date->year)
-                ->whereMonth('created_at', $date->month)
-                ->count();
-        }
-        
-        return [
-            'months' => $months,
-            'events' => $eventCounts
-        ];
-    }
-    
-    private function getCategoryStats()
-    {
-        return Category::withCount('events')
-            ->orderBy('events_count', 'desc')
-            ->get()
-            ->map(function ($category) {
-                return [
-                    'name' => $category->name,
-                    'count' => $category->events_count,
-                    'color' => $category->color ?? '#3B82F6'
-                ];
-            });
-    }
-    
-    private function getUserTrends()
-    {
-        $trends = [];
-        
-        for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i);
-            $trends[] = [
-                'date' => $date->format('M d'),
-                'users' => User::whereDate('created_at', $date)->count(),
-                'events' => Event::whereDate('created_at', $date)->count()
+        try {
+            // Get organizer's events from API
+            $eventsResponse = $this->api->withToken($token)->get('admin/events');
+            $events = collect($eventsResponse['data']['data'] ?? []);
+            
+            // Get categories
+            $categoriesResponse = $this->api->get('categories');
+            $categories = collect($categoriesResponse['data']['data'] ?? []);
+            
+            // Calculate stats
+            $now = Carbon::now();
+            
+            return [
+                'total_users' => 0, // API endpoint belum ada
+                'total_events' => $events->count(),
+                'total_categories' => $categories->count(),
+                'total_participants' => $events->sum('participants_count') ?? 0,
+                'total_feedbacks' => 0, // API endpoint belum ada
+                'active_events' => $events->filter(function($event) use ($now) {
+                    return isset($event['start_date']) && Carbon::parse($event['start_date'])->isAfter($now);
+                })->count(),
+                'completed_events' => $events->filter(function($event) use ($now) {
+                    return isset($event['end_date']) && Carbon::parse($event['end_date'])->isBefore($now);
+                })->count(),
+                'organizers' => 1,
+                'this_month_events' => $events->filter(function($event) use ($now) {
+                    return isset($event['created_at']) && Carbon::parse($event['created_at'])->month === $now->month;
+                })->count(),
+                'this_month_participants' => 0, // API endpoint belum ada
+            ];
+        } catch (\Exception $e) {
+            Log::error('Get dashboard stats error: ' . $e->getMessage());
+            return [
+                'total_users' => 0,
+                'total_events' => 0,
+                'total_categories' => 0,
+                'total_participants' => 0,
+                'total_feedbacks' => 0,
+                'active_events' => 0,
+                'completed_events' => 0,
+                'organizers' => 0,
+                'this_month_events' => 0,
+                'this_month_participants' => 0,
             ];
         }
-        
-        return $trends;
     }
-    
-    private function getTopEvents()
+
+    private function getRecentActivities($token)
     {
-        return Event::withCount('participants')
-            ->with('organizer', 'category')
-            ->orderBy('participants_count', 'desc')
-            ->take(10)
-            ->get();
+        try {
+            // Simplified - return dummy data karena API endpoint belum ada
+            return [];
+        } catch (\Exception $e) {
+            Log::error('Get recent activities error: ' . $e->getMessage());
+            return [];
+        }
     }
-    
+
+    private function getMonthlyEventData($token)
+    {
+        try {
+            // Get organizer's events
+            $eventsResponse = $this->api->withToken($token)->get('admin/events');
+            $events = collect($eventsResponse['data']['data'] ?? []);
+            
+            // Initialize months array
+            $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            $eventCounts = array_fill(0, 12, 0);
+            
+            // Count events per month
+            foreach ($events as $event) {
+                if (isset($event['created_at'])) {
+                    $month = Carbon::parse($event['created_at'])->month - 1; // 0-indexed
+                    if ($month >= 0 && $month < 12) {
+                        $eventCounts[$month]++;
+                    }
+                }
+            }
+            
+            return [
+                'months' => $months,
+                'events' => $eventCounts,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Get monthly event data error: ' . $e->getMessage());
+            return [
+                'months' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                'events' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ];
+        }
+    }
+
+    private function getCategoryStats($token)
+    {
+        try {
+            $categoriesResponse = $this->api->get('categories');
+            $categories = collect($categoriesResponse['data']['data'] ?? []);
+            
+            return $categories->map(function($category) {
+                return (object)[
+                    'name' => $category['name'] ?? 'Unknown',
+                    'count' => $category['events_count'] ?? 0,
+                    'color' => $category['color'] ?? '#3B82F6',
+                ];
+            });
+        } catch (\Exception $e) {
+            Log::error('Get category stats error: ' . $e->getMessage());
+            return collect([]);
+        }
+    }
+
+    private function getTopEvents($token)
+    {
+        try {
+            $eventsResponse = $this->api->withToken($token)->get('admin/events');
+            $events = collect($eventsResponse['data']['data'] ?? []);
+            
+            return $events
+                ->sortByDesc('participants_count')
+                ->take(5)
+                ->map(function($event) {
+                    return (object)[
+                        'id' => $event['id'] ?? null,
+                        'title' => $event['title'] ?? 'Untitled',
+                        'participants_count' => $event['participants_count'] ?? 0,
+                        'start_date' => isset($event['start_date']) ? Carbon::parse($event['start_date']) : null,
+                        'organizer' => (object)[
+                            'full_name' => $event['organizer']['full_name'] ?? $event['organizer']['name'] ?? 'Unknown',
+                        ],
+                        'category' => (object)[
+                            'color' => $event['category']['color'] ?? '#3B82F6',
+                        ],
+                    ];
+                })
+                ->values()
+                ->toArray();
+        } catch (\Exception $e) {
+            Log::error('Get top events error: ' . $e->getMessage());
+            return [];
+        }
+    }
 }

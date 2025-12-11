@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Event;
-use App\Models\EventParticipant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Services\BackendApiService;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class UserController extends Controller
 {
-    public function __construct()
+    protected BackendApiService $api;
+
+    public function __construct(BackendApiService $api)
     {
-        // Role validation is handled by middleware in routes
+        $this->api = $api;
     }
 
     /**
@@ -21,60 +23,65 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        // If super admin, show all admins (event organizers)
-        if (auth()->user()->isSuperAdmin()) {
-            $query = User::where('role', 'admin');
+        try {
+            $token = Session::get('api_token');
+            $user = Session::get('user');
 
-            // Optional role filter
-            if ($request->has('role') && $request->role) {
-                $query->where('role', $request->role);
+            if (!$token || !$user) {
+                return redirect()->route('login');
             }
 
-            // Search
+            // Build query parameters
+            $params = [
+                'page' => $request->get('page', 1),
+            ];
+            
             if ($request->has('search') && $request->search) {
-                $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('full_name', 'like', "%{$search}%");
-                });
+                $params['search'] = $request->search;
+            }
+            
+            if ($request->has('role') && $request->role) {
+                $params['role'] = $request->role;
             }
 
-            $users = $query
-                ->withCount('events')
-                ->with(['eventParticipants'])
-                ->orderBy('created_at', 'desc')
-                ->paginate(10);
+            // Get users from API
+            $response = $this->api->withToken($token)->get('admin/users', $params);
+            
+            $usersData = $response['data']['data'] ?? [];
+            $pagination = $response['data']['pagination'] ?? [
+                'total' => count($usersData),
+                'per_page' => 10,
+                'current_page' => 1,
+                'last_page' => 1
+            ];
 
-            return view('admin.users', compact('users'));
+            // Convert to objects
+            $usersData = array_map(fn($u) => (object) $u, $usersData);
+
+            // Create Laravel paginator
+            $users = new LengthAwarePaginator(
+                $usersData,
+                $pagination['total'] ?? count($usersData),
+                $pagination['per_page'] ?? 10,
+                $pagination['current_page'] ?? 1,
+                [
+                    'path' => $request->url(),
+                    'query' => $request->query(),
+                ]
+            );
+
+            return view('admin.users.index', compact('users'));
+
+        } catch (\Exception $e) {
+            Log::error('Users index error: ' . $e->getMessage());
+            
+            $users = new LengthAwarePaginator([], 0, 10, 1, ['path' => $request->url()]);
+            
+            return view('admin.users.index', [
+                'users' => $users,
+                'error' => 'Tidak dapat memuat data users: ' . $e->getMessage()
+            ]);
         }
-
-        $organizerId = auth()->id();
-        // Get participants from organizer's events
-        $eventIds = Event::where('user_id', $organizerId)->pluck('id');
-        $participantIds = EventParticipant::whereIn('event_id', $eventIds)->pluck('user_id');
-        $query = User::whereIn('id', $participantIds);
-
-        // Search functionality
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('full_name', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by role (only participants can join events)
-        if ($request->has('role') && $request->role) {
-            $query->where('role', $request->role);
-        }
-
-        $users = $query->with(['eventParticipants.event' => function($query) use ($eventIds) {
-            $query->whereIn('id', $eventIds);
-        }])->orderBy('created_at', 'desc')->paginate(10);
-
-        return view('admin.users', compact('users'));
     }
 
     /**
@@ -93,12 +100,11 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'full_name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,participant',
+            'role' => 'required|in:admin,participant,super_admin',
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string|max:1000',
-            // is_organizer removed
         ]);
 
         if ($validator->fails()) {
@@ -107,50 +113,93 @@ class UserController extends Controller
                 ->withInput();
         }
 
-        $user = User::create([
-            'name' => $request->name,
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role,
-            'phone' => $request->phone,
-            'bio' => $request->bio,
-            // is_organizer removed
-        ]);
+        try {
+            $token = Session::get('api_token');
+            
+            $data = $request->only(['name', 'full_name', 'email', 'password', 'password_confirmation', 'role', 'phone', 'bio']);
 
-        return redirect()->route('admin.users')
-            ->with('success', 'User created successfully!');
+            $response = $this->api->withToken($token)->post('admin/users', $data);
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.users.index')
+                    ->with('success', 'User berhasil dibuat!');
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal membuat user')
+                ->withInput();
+
+        } catch (\Exception $e) {
+            Log::error('Users store error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage())
+                ->withInput();
+        }
     }
 
     /**
      * Display the specified user
      */
-    public function show(User $user)
+    public function show($id)
     {
-        return view('admin.users.show', compact('user'));
+        try {
+            $token = Session::get('api_token');
+            
+            $response = $this->api->withToken($token)->get("admin/users/{$id}");
+            $user = (object) ($response['data'] ?? []);
+
+            if (!isset($user->id)) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'User tidak ditemukan');
+            }
+
+            return view('admin.users.show', compact('user'));
+
+        } catch (\Exception $e) {
+            Log::error('Users show error: ' . $e->getMessage());
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Tidak dapat memuat detail user');
+        }
     }
 
     /**
      * Show the form for editing the specified user
      */
-    public function edit(User $user)
+    public function edit($id)
     {
-        return view('admin.users.edit', compact('user'));
+        try {
+            $token = Session::get('api_token');
+            
+            $response = $this->api->withToken($token)->get("admin/users/{$id}");
+            $user = (object) ($response['data'] ?? []);
+
+            if (!isset($user->id)) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'User tidak ditemukan');
+            }
+
+            return view('admin.users.edit', compact('user'));
+
+        } catch (\Exception $e) {
+            Log::error('Users edit form error: ' . $e->getMessage());
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Tidak dapat memuat form edit');
+        }
     }
 
     /**
      * Update the specified user
      */
-    public function update(Request $request, User $user)
+    public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'full_name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'role' => 'required|in:admin,participant',
+            'email' => 'required|string|email|max:255',
+            'role' => 'required|in:admin,participant,super_admin',
             'phone' => 'nullable|string|max:20',
             'bio' => 'nullable|string|max:1000',
-            'is_organizer' => 'boolean',
+            'password' => 'nullable|string|min:8|confirmed',
         ]);
 
         if ($validator->fails()) {
@@ -159,62 +208,96 @@ class UserController extends Controller
                 ->withInput();
         }
 
-        $user->update([
-            'name' => $request->name,
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'role' => $request->role,
-            'phone' => $request->phone,
-            'bio' => $request->bio,
-            // is_organizer removed
-        ]);
+        try {
+            $token = Session::get('api_token');
+            
+            $data = $request->only(['name', 'full_name', 'email', 'role', 'phone', 'bio']);
+            
+            if ($request->filled('password')) {
+                $data['password'] = $request->password;
+                $data['password_confirmation'] = $request->password_confirmation;
+            }
 
-        // Update password if provided
-        if ($request->filled('password')) {
-            $user->update([
-                'password' => Hash::make($request->password)
-            ]);
+            $response = $this->api->withToken($token)->put("admin/users/{$id}", $data);
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.users.index')
+                    ->with('success', 'User berhasil diupdate!');
+            }
+
+            return redirect()->back()
+                ->with('error', $response['message'] ?? 'Gagal mengupdate user')
+                ->withInput();
+
+        } catch (\Exception $e) {
+            Log::error('Users update error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage())
+                ->withInput();
         }
-
-        return redirect()->route('admin.users')
-            ->with('success', 'User updated successfully!');
     }
 
     /**
      * Remove the specified user
      */
-    public function destroy(User $user)
+    public function destroy($id)
     {
-        // Prevent admin from deleting themselves
-        if ($user->id === auth()->id()) {
+        try {
+            $token = Session::get('api_token');
+            $currentUser = Session::get('user');
+            
+            // Prevent deleting self
+            if ($id == $currentUser['id']) {
+                return redirect()->back()
+                    ->with('error', 'Anda tidak dapat menghapus akun sendiri!');
+            }
+            
+            $response = $this->api->withToken($token)->delete("admin/users/{$id}");
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->route('admin.users.index')
+                    ->with('success', 'User berhasil dihapus!');
+            }
+
             return redirect()->back()
-                ->with('error', 'You cannot delete your own account!');
+                ->with('error', $response['message'] ?? 'Gagal menghapus user');
+
+        } catch (\Exception $e) {
+            Log::error('Users destroy error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-
-        $user->delete();
-
-        return redirect()->route('admin.users')
-            ->with('success', 'User deleted successfully!');
     }
 
     /**
-     * Toggle user status (activate/deactivate)
+     * Toggle user status
      */
-    public function toggleStatus(User $user)
+    public function toggleStatus($id)
     {
-        // Prevent admin from deactivating themselves
-        if ($user->id === auth()->id()) {
+        try {
+            $token = Session::get('api_token');
+            $currentUser = Session::get('user');
+            
+            // Prevent toggling self
+            if ($id == $currentUser['id']) {
+                return redirect()->back()
+                    ->with('error', 'Anda tidak dapat mengubah status akun sendiri!');
+            }
+            
+            $response = $this->api->withToken($token)->post("admin/users/{$id}/toggle-status");
+
+            if (isset($response['success']) && $response['success']) {
+                return redirect()->back()
+                    ->with('success', 'Status user berhasil diubah!');
+            }
+
             return redirect()->back()
-                ->with('error', 'You cannot deactivate your own account!');
+                ->with('error', $response['message'] ?? 'Gagal mengubah status');
+
+        } catch (\Exception $e) {
+            Log::error('Users toggle status error: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-
-        $user->update([
-            'is_active' => !$user->is_active
-        ]);
-
-        $status = $user->is_active ? 'activated' : 'deactivated';
-        return redirect()->back()
-            ->with('success', "User {$status} successfully!");
     }
 }
-

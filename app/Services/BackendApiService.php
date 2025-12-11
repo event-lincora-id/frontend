@@ -36,8 +36,9 @@ class BackendApiService
         $this->client = Http::baseUrl($baseUrl)
             ->acceptJson()
             ->asJson()
+            ->withoutVerifying() // Disable SSL verification untuk staging
             ->timeout((int) config('services.backend.timeout', 10))
-            ->connectTimeout(5); // Connection timeout separate from total timeout
+            ->connectTimeout(5);
     }
 
     /**
@@ -145,6 +146,16 @@ class BackendApiService
         if ($response->failed()) {
             $message = $response->json('message') ?? 'Backend API request failed';
             $status = $response->status();
+            
+            // Log detailed error information
+            \Log::error('Backend API Error', [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'status' => $status,
+                'message' => $message,
+                'response_body' => $response->body(),
+                'response_json' => $response->json(),
+            ]);
             
             throw new BackendApiException(
                 "Backend API returned error ({$status}): {$message}",

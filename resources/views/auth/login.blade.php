@@ -38,11 +38,13 @@
                 
                 <h1 class="text-3xl font-extrabold text-gray-900">Welcome!</h1>
                 <p class="mt-1 text-sm text-gray-500">Silahkan masukkan username dan password anda</p>
+            
             @if(session('success'))
                 <div class="mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
                     {{ session('success') }}
                 </div>
             @endif
+            
             @if($errors->any())
                 <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                     @foreach($errors->all() as $error)
@@ -50,172 +52,61 @@
                     @endforeach
                 </div>
             @endif
-            <div id="error-message" class="mt-4 hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"></div>
-            <form id="login-form" class="mt-8 space-y-5">
+            
+            <form id="login-form" method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">
+                @csrf
+                
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required
+                    <input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"
                            class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition"
                            placeholder="lorem@gmail.com">
-                    <p id="email-error" class="mt-1 text-sm text-red-600 hidden"></p>
+                    @error('email')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
+                
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
                     <input id="password" name="password" type="password" autocomplete="current-password" required
                            class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition"
                            placeholder="••••••••">
-                    <p id="password-error" class="mt-1 text-sm text-red-600 hidden"></p>
+                    @error('password')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
+                
                 <div class="flex items-center justify-between">
                     <label class="inline-flex items-center gap-2 text-xs text-gray-600">
-                        <input type="checkbox" class="rounded border-gray-300 text-[#F4B6B6] focus:ring-[#F4B6B6]">
+                        <input type="checkbox" name="remember" class="rounded border-gray-300 text-[#F4B6B6] focus:ring-[#F4B6B6]">
                         Ingat saya
                     </label>
                     <a href="{{ route('password.request') }}" class="text-xs text-gray-500 hover:text-gray-700">Lupa Password?</a>
                 </div>
+                
                 <button type="submit" id="login-button"
-                        class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6] hover:bg-[#ef9fa0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F4B6B6] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6] hover:bg-[#ef9fa0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F4B6B6] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition">
                     <span id="login-button-text">Masuk</span>
                     <span id="login-button-loading" class="hidden">
                         <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
                     </span>
                 </button>
+                
                 <p class="text-center text-xs text-gray-500">
                     Belum Memiliki Akun? <a href="{{ route('register') }}" class="underline hover:text-gray-700">Daftar Disini</a>
                 </p>
             </form>
+            
             <script>
-                document.getElementById('login-form').addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    // Reset error messages
-                    document.getElementById('error-message').classList.add('hidden');
-                    document.getElementById('email-error').classList.add('hidden');
-                    document.getElementById('password-error').classList.add('hidden');
-                    
-                    // Get form data
-                    const email = document.getElementById('email').value;
-                    const password = document.getElementById('password').value;
-                    
-                    // Disable button and show loading
+                // Show loading state on form submit
+                document.getElementById('login-form').addEventListener('submit', function(e) {
                     const loginButton = document.getElementById('login-button');
                     const loginButtonText = document.getElementById('login-button-text');
                     const loginButtonLoading = document.getElementById('login-button-loading');
+                    
                     loginButton.disabled = true;
                     loginButtonText.classList.add('hidden');
                     loginButtonLoading.classList.remove('hidden');
-                    
-                    try {
-                        console.log('Attempting login with email:', email);
-                        
-                        // Call API login endpoint
-                        const response = await fetch('/api/auth/login', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            body: JSON.stringify({
-                                email: email,
-                                password: password
-                            })
-                        });
-                        
-                        console.log('API Response status:', response.status);
-                        
-                        let data;
-                        try {
-                            data = await response.json();
-                            console.log('API Response data:', data);
-                        } catch (parseError) {
-                            console.error('Failed to parse JSON response:', parseError);
-                            const textResponse = await response.text();
-                            console.error('Response text:', textResponse);
-                            throw new Error('Invalid response from server');
-                        }
-                        
-                        if (!response.ok) {
-                            // Handle validation errors
-                            if (data.errors) {
-                                if (data.errors.email) {
-                                    document.getElementById('email-error').textContent = data.errors.email[0];
-                                    document.getElementById('email-error').classList.remove('hidden');
-                                }
-                                if (data.errors.password) {
-                                    document.getElementById('password-error').textContent = data.errors.password[0];
-                                    document.getElementById('password-error').classList.remove('hidden');
-                                }
-                            } else {
-                                // Show general error message
-                                const errorMessage = document.getElementById('error-message');
-                                errorMessage.textContent = data.message || 'Login gagal. Silakan coba lagi.';
-                                errorMessage.classList.remove('hidden');
-                            }
-                            loginButton.disabled = false;
-                            loginButtonText.classList.remove('hidden');
-                            loginButtonLoading.classList.add('hidden');
-                            return;
-                        }
-                        
-                        // Save token to localStorage
-                        if (data.success && data.data && data.data.token) {
-                            console.log('Login successful, token received');
-                            localStorage.setItem('access_token', data.data.token);
-                            
-                            // Get CSRF token from meta tag
-                            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                            
-                            // Create session from token
-                            console.log('Creating session from token...');
-                            const sessionResponse = await fetch('/auth/create-session', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': csrfToken,
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: JSON.stringify({
-                                    token: data.data.token,
-                                    email: data.data.user.email
-                                })
-                            });
-                            
-                            console.log('Session response status:', sessionResponse.status);
-                            
-                            let sessionData;
-                            try {
-                                sessionData = await sessionResponse.json();
-                                console.log('Session response data:', sessionData);
-                            } catch (parseError) {
-                                console.error('Failed to parse session JSON:', parseError);
-                                const textResponse = await sessionResponse.text();
-                                console.error('Session response text:', textResponse);
-                                throw new Error('Gagal membuat session: Invalid response');
-                            }
-                            
-                            if (sessionData.success && sessionData.redirect_url) {
-                                console.log('Session created successfully, redirecting to:', sessionData.redirect_url);
-                                // Redirect to dashboard
-                                window.location.href = sessionData.redirect_url;
-                            } else {
-                                console.error('Session creation failed:', sessionData);
-                                throw new Error(sessionData.message || 'Gagal membuat session');
-                            }
-                        } else {
-                            console.error('Token not found in response:', data);
-                            throw new Error('Token tidak ditemukan dalam response');
-                        }
-                    } catch (error) {
-                        console.error('Login error:', error);
-                        const errorMessage = document.getElementById('error-message');
-                        errorMessage.textContent = error.message || 'Terjadi kesalahan. Silakan coba lagi.';
-                        errorMessage.classList.remove('hidden');
-                        loginButton.disabled = false;
-                        loginButtonText.classList.remove('hidden');
-                        loginButtonLoading.classList.add('hidden');
-                    }
                 });
             </script>
             </div>

@@ -29,40 +29,32 @@
                 <!-- Event Header -->
                 <div class="mb-8">
                     <!-- Category Badge -->
-                    <div class="flex items-center mb-4">
-                        <div class="w-4 h-4 rounded-full mr-3" style="background-color: {{ $event->category->color ?? '#3B82F6' }}"></div>
-                        <span class="text-sm font-medium text-gray-600">{{ $event->category->name ?? 'Uncategorized' }}</span>
-                    </div>
+@if($event->category)
+<div class="flex items-center mb-4">
+    <div class="w-4 h-4 rounded-full mr-3" style="background-color: {{ $event->category->color ?? '#3B82F6' }}"></div>
+    <span class="text-sm font-medium text-gray-600">{{ $event->category->name ?? 'Uncategorized' }}</span>
+</div>
+@endif
 
-                    <!-- Event Title -->
-                    <h1 class="text-4xl font-bold text-gray-900 mb-4">{{ $event->title }}</h1>
+<!-- Event Title -->
+<h1 class="text-4xl font-bold text-gray-900 mb-4">{{ $event->title }}</h1>
 
-                    <!-- TOMBOL BOOKMARK -->
-                    <div class="flex items-center gap-3 mb-4">
-                        @auth
-                            <button 
-                                id="bookmarkBtn" 
-                                onclick="toggleBookmark({{ $event->id }})"
-                                class="bookmark-btn flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 {{ auth()->user()->hasBookmarked($event->id) ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}"
-                                data-bookmarked="{{ auth()->user()->hasBookmarked($event->id) ? 'true' : 'false' }}"
-                            >
-                                <i class="fas fa-bookmark mr-2"></i>
-                                <span id="bookmarkText">{{ auth()->user()->hasBookmarked($event->id) ? 'Bookmarked' : 'Bookmark Event' }}</span>
-                            </button>
-                            
-                            <!-- Share Button -->
-                            <button onclick="shareEvent()" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
-                                <i class="fas fa-share-alt mr-2"></i>
-                                Share
-                            </button>
-                        @else
-                            <a href="{{ route('login') }}" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
-                                <i class="fas fa-bookmark mr-2"></i>
-                                Login to Bookmark
-                            </a>
-                        @endauth
-                    </div>
-                    <!-- AKHIR TOMBOL BOOKMARK -->
+<!-- Bookmark & Share Buttons -->
+<div class="flex items-center gap-3 mb-4">
+    @if(session('user'))
+        <button id="bookmarkBtn" onclick="toggleBookmark({{ $event->id }})" class="flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200" data-bookmarked="false">
+            <i class="fas fa-bookmark mr-2"></i>
+            <span id="bookmarkText">Bookmark Event</span>
+        </button>
+        <button onclick="shareEvent()" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
+            <i class="fas fa-share-alt mr-2"></i>Share
+        </button>
+    @else
+        <a href="{{ route('login') }}" class="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-all duration-200">
+            <i class="fas fa-bookmark mr-2"></i>Login to Bookmark
+        </a>
+    @endif
+</div>
 
                     <!-- Event Meta -->
                     <div class="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
@@ -86,9 +78,9 @@
                 </div>
 
                 <!-- Event Image -->
-                @if($event->image)
+                @if($event->image_url)
                     <div class="mb-8">
-                        <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-64 object-cover rounded-lg">
+                        <img src="{{ $event->image_url }}" alt="{{ $event->title }}" class="w-full h-64 object-cover rounded-lg shadow-lg">
                     </div>
                 @endif
 
@@ -122,8 +114,12 @@
                         </div>
                         <div>
                             <h4 class="font-semibold text-gray-900 mb-2">Organizer</h4>
-                            <p class="text-gray-700">{{ $event->organizer->full_name ?? $event->organizer->name }}</p>
-                            <p class="text-sm text-gray-600">{{ $event->organizer->email }}</p>
+@if($event->organizer)
+    <p class="text-gray-700">{{ $event->organizer->full_name ?? $event->organizer->name ?? 'Unknown' }}</p>
+    <p class="text-sm text-gray-600">{{ $event->organizer->email ?? '' }}</p>
+@else
+    <p class="text-gray-700">Unknown Organizer</p>
+@endif
                         </div>
                     </div>
                 </div>
@@ -189,55 +185,65 @@
                     @endif
 
                     <!-- Action Buttons -->
-                    @auth
-                        @if($isParticipating)
-                            <button class="w-full bg-gray-500 text-white py-3 rounded-lg font-medium mb-3" disabled>
-                                <i class="fas fa-check mr-2"></i>Already Registered
-                            </button>
-                        @elseif($event->registered_count >= $event->quota)
-                            <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
-                                <i class="fas fa-times mr-2"></i>Event Full
-                            </button>
-                        @elseif($event->start_date < now())
-                            <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
-                                <i class="fas fa-clock mr-2"></i>Event Started
-                            </button>
-                        @else
-                            @if($event->price > 0)
-                                <button class="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 mb-3" onclick="showPaymentModal()">
-                                    <i class="fas fa-credit-card mr-2"></i>Join Event (Paid)
-                                </button>
-                            @else
-                                <button class="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 mb-3" onclick="joinEvent()">
-                                    <i class="fas fa-plus mr-2"></i>Join Event (Free)
-                                </button>
-                            @endif
-                        @endif
-                    @else
-                        <a href="{{ route('login') }}" class="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 mb-3 inline-block text-center">
-                            <i class="fas fa-sign-in-alt mr-2"></i>Login to Join
-                        </a>
-                    @endauth
+@if(session('user'))
+    @if($isParticipating ?? false)
+        <!-- Already Registered -->
+        <a href="{{ route('my.participations') }}" class="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 mb-3 inline-block text-center">
+            <i class="fas fa-check-circle mr-2"></i>View My QR Code
+        </a>
+    @elseif($event->quota > 0 && $event->registered_count >= $event->quota)
+        <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
+            <i class="fas fa-times mr-2"></i>Event Full
+        </button>
+    @elseif($event->start_date < now())
+        <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
+            <i class="fas fa-clock mr-2"></i>Event Started
+        </button>
+    @else
+        <!-- Join Event Form -->
+        <form action="{{ route('events.register', $event->id) }}" method="POST" id="joinEventForm" onsubmit="handleJoinSubmit(event)">
+            @csrf
+            <button type="submit" id="joinEventBtn" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                <span id="joinBtnText">
+                    <i class="fas fa-plus mr-2"></i>Join Event Now
+                </span>
+                <span id="joinBtnLoading" class="hidden">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>Joining...
+                </span>
+            </button>
+        </form>
+    @endif
+@else
+    <a href="{{ route('login') }}" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 inline-block text-center">
+        <i class="fas fa-sign-in-alt mr-2"></i>Login to Join
+    </a>
+@endif
 
-                    <a href="{{ route('events.index') }}" class="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200 inline-block text-center">
-                        <i class="fas fa-arrow-left mr-2"></i>Back to Events
-                    </a>
+<a href="{{ route('events.index') }}" class="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors duration-200 inline-block text-center">
+    <i class="fas fa-arrow-left mr-2"></i>Back to Events
+</a>
                 </div>
 
                 <!-- Organizer Info -->
-                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Organizer</h3>
-                    <div class="flex items-center">
-                        <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
-                            {{ substr($event->organizer->name ?? 'O', 0, 1) }}
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-gray-900">{{ $event->organizer->full_name ?? $event->organizer->name }}</h4>
-                            <p class="text-sm text-gray-600">{{ $event->organizer->email }}</p>
-                            @if($event->organizer->bio)
-                                <p class="text-sm text-gray-700 mt-2">{{ Str::limit($event->organizer->bio, 100) }}</p>
-                            @endif
-                        </div>
+<div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Organizer</h3>
+    @if($event->organizer)
+        <div class="flex items-center">
+            <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                {{ strtoupper(substr($event->organizer->name ?? $event->organizer->full_name ?? 'O', 0, 1)) }}
+            </div>
+            <div>
+                <h4 class="font-semibold text-gray-900">{{ $event->organizer->full_name ?? $event->organizer->name ?? 'Unknown' }}</h4>
+                <p class="text-sm text-gray-600">{{ $event->organizer->email ?? '' }}</p>
+                @if(isset($event->organizer->bio) && $event->organizer->bio)
+                    <p class="text-sm text-gray-700 mt-2">{{ Str::limit($event->organizer->bio, 100) }}</p>
+                @endif
+            </div>
+        </div>
+    @else
+        <p class="text-gray-600">No organizer information available</p>
+    @endif
+</div>
                     </div>
                 </div>
 
@@ -611,50 +617,85 @@
 
 <!-- Bookmark JavaScript -->
 <script>
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // Bookmark Manager dengan localStorage
+    const BookmarkManager = {
+        STORAGE_KEY: 'event_bookmarks',
+        
+        getBookmarks() {
+            const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+            return bookmarks ? JSON.parse(bookmarks) : [];
+        },
+        
+        saveBookmarks(bookmarks) {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks));
+        },
+        
+        addBookmark(eventId) {
+            const bookmarks = this.getBookmarks();
+            if (!bookmarks.includes(eventId)) {
+                bookmarks.push(eventId);
+                this.saveBookmarks(bookmarks);
+                return true;
+            }
+            return false;
+        },
+        
+        removeBookmark(eventId) {
+            const bookmarks = this.getBookmarks();
+            const filtered = bookmarks.filter(id => id !== eventId);
+            this.saveBookmarks(filtered);
+            return true;
+        },
+        
+        isBookmarked(eventId) {
+            return this.getBookmarks().includes(eventId);
+        }
+    };
 
-    async function toggleBookmark(eventId) {
+    function toggleBookmark(eventId) {
+        console.log('Detail bookmark clicked!', eventId);
         const btn = document.getElementById('bookmarkBtn');
         const text = document.getElementById('bookmarkText');
-        const isBookmarked = btn.dataset.bookmarked === 'true';
+        const isBookmarked = BookmarkManager.isBookmarked(eventId);
 
         try {
-            const response = await fetch(`/participant/bookmarks/${eventId}/toggle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({
-                    category: 'saved'
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Toggle UI
-                if (data.bookmarked) {
-                    btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-                    btn.classList.add('bg-red-600', 'text-white');
-                    text.textContent = 'Bookmarked';
-                    btn.dataset.bookmarked = 'true';
-                    showToast('Event bookmarked successfully! 🎉', 'success');
-                } else {
-                    btn.classList.remove('bg-red-600', 'text-white');
-                    btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-                    text.textContent = 'Bookmark Event';
-                    btn.dataset.bookmarked = 'false';
-                    showToast('Bookmark removed', 'info');
-                }
+            if (isBookmarked) {
+                // Remove bookmark
+                BookmarkManager.removeBookmark(eventId);
+                btn.classList.remove('bg-red-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                text.textContent = 'Bookmark Event';
+                btn.dataset.bookmarked = 'false';
+                showToast('Bookmark removed', 'info');
             } else {
-                showToast(data.message || 'Failed to bookmark event', 'error');
+                // Add bookmark
+                BookmarkManager.addBookmark(eventId);
+                btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                btn.classList.add('bg-red-600', 'text-white');
+                text.textContent = 'Bookmarked';
+                btn.dataset.bookmarked = 'true';
+                showToast('Event bookmarked successfully! 🎉', 'success');
             }
         } catch (error) {
-            console.error('Error:', error);
-            showToast('Failed to bookmark event', 'error');
+            console.error('Bookmark toggle error:', error);
+            showToast('Failed to toggle bookmark', 'error');
         }
     }
+
+    // Check bookmark status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Initializing detail bookmark...');
+        const eventId = {{ $event->id }};
+        const btn = document.getElementById('bookmarkBtn');
+        const text = document.getElementById('bookmarkText');
+        
+        if (BookmarkManager.isBookmarked(eventId)) {
+            btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+            btn.classList.add('bg-red-600', 'text-white');
+            text.textContent = 'Bookmarked';
+            btn.dataset.bookmarked = 'true';
+        }
+    });
 
     function shareEvent() {
         const url = window.location.href;
@@ -695,7 +736,46 @@
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    // Handle join event form submission
+    function handleJoinSubmit(event) {
+        const btn = document.getElementById('joinEventBtn');
+        const btnText = document.getElementById('joinBtnText');
+        const btnLoading = document.getElementById('joinBtnLoading');
+        
+        // Disable button and show loading
+        btn.disabled = true;
+        btnText.classList.add('hidden');
+        btnLoading.classList.remove('hidden');
+        
+        // Form will submit normally, button state will reset on page reload
+        return true;
+    }
 </script>
+
+@if(session('success'))
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        showNotification('✓ Success!', '{{ session('success') }}', 'success');
+    });
+</script>
+@endif
+
+@if(session('error'))
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        showNotification('✗ Error', '{{ session('error') }}', 'error');
+    });
+</script>
+@endif
+
+@if(session('info'))
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        showNotification('ℹ Info', '{{ session('info') }}', 'info');
+    });
+</script>
+@endif
 
 <style>
     @keyframes slide-in {

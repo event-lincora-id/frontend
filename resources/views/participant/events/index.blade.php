@@ -2,6 +2,89 @@
 
 @section('title', 'Browse Events - Event Connect')
 
+@push('head-scripts')
+<!-- Bookmark Functions - localStorage ONLY -->
+<script>
+// Toast notification function
+function showToast(message, type = 'info') {
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        info: 'bg-blue-500'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Bookmark Manager - localStorage ONLY
+window.BookmarkManager = {
+    STORAGE_KEY: 'event_bookmarks',
+    
+    getBookmarks() {
+        const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+        return bookmarks ? JSON.parse(bookmarks) : [];
+    },
+    
+    saveBookmarks(bookmarks) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks));
+    },
+    
+    toggle(eventId) {
+        const bookmarks = this.getBookmarks();
+        const index = bookmarks.indexOf(eventId);
+        if (index > -1) {
+            bookmarks.splice(index, 1);
+            this.saveBookmarks(bookmarks);
+            return false;
+        } else {
+            bookmarks.push(eventId);
+            this.saveBookmarks(bookmarks);
+            return true;
+        }
+    },
+    
+    isBookmarked(eventId) {
+        return this.getBookmarks().includes(eventId);
+    }
+};
+
+// Global toggle function
+window.toggleBookmarkCard = function(eventId, button, event) {
+    console.log('🔖 Bookmark card clicked!', eventId);
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const isBookmarked = window.BookmarkManager.toggle(eventId);
+    
+    // Update UI
+    if (isBookmarked) {
+        button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+        button.classList.add('bg-red-600', 'text-white');
+        button.dataset.bookmarked = 'true';
+        button.title = 'Remove bookmark';
+        showToast('Bookmarked! 🎉', 'success');
+    } else {
+        button.classList.remove('bg-red-600', 'text-white');
+        button.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+        button.dataset.bookmarked = 'false';
+        button.title = 'Bookmark this event';
+        showToast('Bookmark removed', 'info');
+    }
+};
+
+console.log('✅ Explore bookmark script loaded!');
+</script>
+@endpush
+
 @section('content')
 <div class="bg-white">
     <!-- Hero Section (Dark Red) -->
@@ -13,165 +96,254 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        <!-- Search and Filter Section (Always show in Explore) -->
+        <!-- Search and Filter Section -->
         <div class="mb-8" id="filterSection">
             <form method="GET" action="{{ route('events.index') }}" id="searchForm">
-                <!-- Search Bar - 3 Input Horizontal -->
+                <!-- Search Bar - 2 Input Horizontal with Category Filter -->
                 <div class="flex gap-4 items-end">
-                    <!-- Nama Event -->
+                    <!-- Search Event Name -->
                     <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Nama Event</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Event</label>
                         <input type="text" 
                                name="search" 
-                               value="{{ request('search') }}"
-                               placeholder="Nama Event"
+                               value="{{ $currentSearch ?? '' }}"
+                               placeholder="Search by event name..."
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
                     </div>
                     
-                    <!-- Tanggal -->
-                    <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
-                        <select name="date_filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                            <option value="">Any Date</option>
-                            <option value="today" {{ request('date_filter') == 'today' ? 'selected' : '' }}>Today</option>
-                            <option value="tomorrow" {{ request('date_filter') == 'tomorrow' ? 'selected' : '' }}>Tomorrow</option>
-                            <option value="this_week" {{ request('date_filter') == 'this_week' ? 'selected' : '' }}>This Week</option>
-                            <option value="next_week" {{ request('date_filter') == 'next_week' ? 'selected' : '' }}>Next Week</option>
-                            <option value="this_month" {{ request('date_filter') == 'this_month' ? 'selected' : '' }}>This Month</option>
+                    <!-- Category Filter -->
+                    <div class="w-64">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                        <select name="category_id" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                onchange="this.form.submit()">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" 
+                                        {{ ($currentCategory ?? '') == $category->id ? 'selected' : '' }}>
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
                         </select>
-                    </div>
-                    
-                    <!-- Free/Price -->
-                    <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Free</label>
-                        <select name="price_range" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                            @php
-                                $derivedRange = '';
-                                $min = request('price_min');
-                                $max = request('price_max');
-                                if ($min !== null && $max !== null && $min == 0 && $max == 0) {
-                                    $derivedRange = 'free';
-                                } elseif ($min == 0 && $max == 100000) {
-                                    $derivedRange = '0-100000';
-                                } elseif ($min == 100000 && $max == 500000) {
-                                    $derivedRange = '100000-500000';
-                                } elseif ($min == 500000 && $max == 1000000) {
-                                    $derivedRange = '500000-1000000';
-                                } elseif ($min == 1000000 && ($max === null || $max === '')) {
-                                    $derivedRange = '1000000+';
-                                }
-                                $currentPriceRange = request('price_range', $derivedRange);
-                            @endphp
-                            <option value="" {{ $currentPriceRange === '' ? 'selected' : '' }}>Any Price</option>
-                            <option value="free" {{ $currentPriceRange === 'free' ? 'selected' : '' }}>Free</option>
-                            <option value="0-100000" {{ $currentPriceRange === '0-100000' ? 'selected' : '' }}>Under 100K</option>
-                            <option value="100000-500000" {{ $currentPriceRange === '100000-500000' ? 'selected' : '' }}>100K - 500K</option>
-                            <option value="500000-1000000" {{ $currentPriceRange === '500000-1000000' ? 'selected' : '' }}>500K - 1M</option>
-                            <option value="1000000+" {{ $currentPriceRange === '1000000+' ? 'selected' : '' }}>Above 1M</option>
-                        </select>
-                        @if(request()->has('price_min'))
-                            <input type="hidden" name="price_min" value="{{ request('price_min') }}">
-                        @endif
-                        @if(request()->has('price_max'))
-                            <input type="hidden" name="price_max" value="{{ request('price_max') }}">
-                        @endif
                     </div>
                     
                     <!-- Search Button -->
                     <div>
-                        <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2">
+                        <button type="submit" 
+                                class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2 transition-colors">
                             <i class="fas fa-search"></i>
                             <span>Search</span>
                         </button>
                     </div>
+                    
+                    <!-- Clear Filters Button -->
+                    @if($currentSearch || $currentCategory)
+                    <div>
+                        <a href="{{ route('events.index') }}" 
+                           class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2 transition-colors">
+                            <i class="fas fa-times"></i>
+                            <span>Clear</span>
+                        </a>
+                    </div>
+                    @endif
                 </div>
+                
+                <!-- Active Filters Info -->
+                @if($currentSearch || $currentCategory)
+                <div class="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                    <span class="font-medium">Active filters:</span>
+                    @if($currentSearch)
+                        <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full">
+                            Search: "{{ $currentSearch }}"
+                        </span>
+                    @endif
+                    @if($currentCategory)
+                        @php
+                            $selectedCategory = $categories->firstWhere('id', $currentCategory);
+                        @endphp
+                        @if($selectedCategory)
+                            <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                                Category: {{ $selectedCategory->name }}
+                            </span>
+                        @endif
+                    @endif
+                </div>
+                @endif
             </form>
         </div>
 
-        <!-- Categories Section -->
+        <!-- Categories Quick Access -->
         <div class="mb-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Categories</h2>
-            <div class="flex overflow-x-auto gap-4 pb-4 scrollbar-hide" style="scrollbar-width: none; -ms-overflow-style: none;">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Browse by Category</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <a href="{{ route('events.index') }}" 
+                   class="px-4 py-3 rounded-lg text-center transition-all {{ !$currentCategory ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    <div class="font-medium">All Events</div>
+                </a>
                 @foreach($categories as $category)
-                    <a href="{{ route('events.index', ['explore' => true, 'category_id' => $category->id]) }}" 
-                       class="flex-shrink-0 w-32 h-24 bg-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-300 transition-colors">
-                        <span class="text-sm font-medium text-gray-700 text-center px-2">{{ $category->name }}</span>
+                    <a href="{{ route('events.index', ['category_id' => $category->id]) }}" 
+                       class="px-4 py-3 rounded-lg text-center transition-all {{ ($currentCategory ?? '') == $category->id ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                        <div class="font-medium text-sm">{{ $category->name }}</div>
                     </a>
                 @endforeach
             </div>
         </div>
 
-        <!-- Results Section -->
-        <div class="mb-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Results</h2>
-            @if($events->count() > 0)
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    @foreach($events as $event)
-                        <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                            <!-- Event Image -->
-                            <div class="relative h-48 bg-gray-300">
-                                @if($event->image)
-                                    <img src="{{ Storage::url($event->image) }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
-                                @else
-                                    <div class="flex items-center justify-center h-full text-gray-500">
-                                        <div class="text-center">
-                                            <i class="fas fa-calendar-alt text-4xl mb-2"></i>
-                                            <p class="text-sm">{{ $event->category->name ?? 'Event' }}</p>
-                                        </div>
-                                    </div>
-                                @endif
-                                
-                                <!-- Bookmark Button -->
-                                @auth
-                                    <button 
-                                        onclick="toggleBookmarkCard({{ $event->id }}, this, event)"
-                                        class="bookmark-btn-card absolute top-3 right-3 w-10 h-10 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center {{ auth()->user()->hasBookmarked($event->id) ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100' }}"
-                                        data-bookmarked="{{ auth()->user()->hasBookmarked($event->id) ? 'true' : 'false' }}"
-                                        title="{{ auth()->user()->hasBookmarked($event->id) ? 'Remove bookmark' : 'Bookmark this event' }}"
-                                    >
-                                        <i class="fas fa-bookmark"></i>
-                                    </button>
-                                @endauth
+       <!-- Results Section -->
+<div class="mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-900">
+            @if($currentSearch || $currentCategory)
+                Search Results
+            @else
+                All Events
+            @endif
+            <span class="text-gray-500 text-lg ml-2">({{ $events->count() }} events)</span>
+        </h2>
+    </div>
+    
+    @if(isset($error))
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+            <p>{{ $error }}</p>
+        </div>
+    @endif
+    
+    @if($events->count() > 0)
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @foreach($events as $event)
+                <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
+                    <!-- Event Image -->
+                    <div class="relative h-48 bg-gray-300">
+                        @if($event->image_url)
+                            <img src="{{ $event->image_url }}" alt="{{ $event->title }}" class="w-full h-full object-cover">
+                        @else
+                            <div class="w-full h-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                                <i class="fas fa-calendar-alt text-white text-6xl opacity-30"></i>
                             </div>
-                            <!-- Event Details -->
-                            <div class="p-4 bg-pink-100">
-                                <h3 class="font-semibold text-gray-900 mb-2 line-clamp-2">
-                                    <a href="{{ route('events.show', $event) }}" class="hover:text-red-600">
-                                        {{ $event->title }}
-                                    </a>
-                                </h3>
-                                <div class="text-sm text-gray-600 space-y-1">
-                                    <p><i class="fas fa-calendar mr-1"></i>{{ $event->start_date->format('M d, Y') }}</p>
-                                    <p><i class="fas fa-map-marker-alt mr-1"></i>{{ Str::limit($event->location, 30) }}</p>
-                                    <p class="font-semibold text-gray-900 mt-2">
-                                        @if($event->price > 0)
-                                            Rp {{ number_format($event->price) }}
-                                        @else
-                                            Free
-                                        @endif
-                                    </p>
-                                </div>
+                        @endif
+                        
+                        <!-- Category Badge -->
+                        @if($event->category)
+                            <div class="absolute top-3 left-3">
+                                <span class="bg-red-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
+                                    {{ $event->category->name }}
+                                </span>
+                            </div>
+                        @endif
+                        
+                        <!-- Price Badge -->
+                        <div class="absolute bottom-3 right-3">
+                            @if($event->price > 0)
+                                <span class="bg-yellow-400 text-gray-900 text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                                    Rp {{ number_format($event->price, 0, ',', '.') }}
+                                </span>
+                            @else
+                                <span class="bg-green-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg">
+                                    FREE
+                                </span>
+                            @endif
+                        </div>
+                        
+                        <!-- Bookmark Button -->
+                        @if(session('user'))
+                            <button 
+                                onclick="toggleBookmarkCard({{ $event->id }}, this, event)"
+                                class="bookmark-btn-card absolute top-3 right-3 w-10 h-10 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center bg-white text-gray-700 hover:bg-gray-100"
+                                data-event-id="{{ $event->id }}"
+                                data-bookmarked="false"
+                                title="Bookmark this event"
+                            >
+                                <i class="fas fa-bookmark"></i>
+                            </button>
+                        @endif
+                    </div>
+                    
+                    <!-- Event Details -->
+                    <div class="p-5">
+                        <h3 class="font-bold text-lg text-gray-900 mb-3 line-clamp-2 hover:text-red-600 transition-colors">
+                            <a href="{{ route('events.show', $event->id) }}">
+                                {{ $event->title }}
+                            </a>
+                        </h3>
+                        
+                        <div class="space-y-2 text-sm text-gray-600 mb-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-calendar-alt w-5 text-red-500"></i>
+                                <span>{{ $event->start_date->format('D, M d, Y') }}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-clock w-5 text-red-500"></i>
+                                <span>{{ $event->start_date->format('H:i') }}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-map-marker-alt w-5 text-red-500"></i>
+                                <span class="line-clamp-1">{{ $event->location }}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <i class="fas fa-users w-5 text-red-500"></i>
+                                <span>{{ $event->registered_count ?? 0 }} / {{ $event->quota ?? 0 }} participants</span>
                             </div>
                         </div>
-                    @endforeach
+                        
+                        <a href="{{ route('events.show', $event->id) }}" 
+                           class="block w-full text-center bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors font-medium">
+                            View Details
+                        </a>
+                    </div>
                 </div>
-
-                <!-- Pagination -->
-                <div class="flex justify-center mt-8">
-                    {{ $events->links() }}
-                </div>
-            @else
-                <!-- No Results -->
-                <div class="text-center py-12">
-                    <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-2">No Events Found</h3>
-                    <p class="text-gray-600 mb-6">Try adjusting your search criteria or browse all events.</p>
-                    <a href="{{ route('events.index') }}" class="bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700">
-                        Browse All Events
-                    </a>
-                </div>
-            @endif
+            @endforeach
         </div>
+    @else
+        <!-- No Results -->
+        <div class="text-center py-16">
+            <div class="max-w-md mx-auto">
+                <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    @if(request('search') || request('category'))
+                        <i class="fas fa-search text-5xl text-gray-400"></i>
+                    @else
+                        <i class="fas fa-calendar-times text-5xl text-gray-400"></i>
+                    @endif
+                </div>
+                
+                @if(request('search') || request('category'))
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">No Events Match Your Search</h3>
+                    <p class="text-gray-600 mb-6">We couldn't find any events matching "{{ request('search') }}"
+                        @if(request('category')) in {{ $categories->firstWhere('id', request('category'))->name ?? 'this category' }} @endif
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                        <a href="{{ route('events.index') }}" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium">
+                            <i class="fas fa-times mr-2"></i>Clear Filters
+                        </a>
+                        <button onclick="history.back()" class="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                            <i class="fas fa-arrow-left mr-2"></i>Go Back
+                        </button>
+                    </div>
+                @else
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">No Events Available Yet</h3>
+                    <p class="text-gray-600 mb-6">There are currently no published events. Check back soon!</p>
+                    
+                    <!-- Info Box for Organizers -->
+                    @if(session('user') && (session('user')['role'] === 'admin' || session('user')['role'] === 'organizer'))
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-left">
+                            <h4 class="font-semibold text-blue-900 mb-2 flex items-center">
+                                <i class="fas fa-lightbulb mr-2"></i>
+                                You can create events!
+                            </h4>
+                            <p class="text-sm text-blue-800 mb-4">As an organizer, you can create and publish events for the community.</p>
+                            <a href="{{ route('admin.events') }}" class="inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-900">
+                                Go to Admin Dashboard <i class="fas fa-arrow-right ml-2"></i>
+                            </a>
+                        </div>
+                    @endif
+                    
+                    <a href="{{ route('home') }}" class="inline-block bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium shadow-md">
+                        <i class="fas fa-home mr-2"></i>Back to Home
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
+</div>
     </div>
 </div>
 @endsection
@@ -291,47 +463,58 @@
 </script>
 
 <script>
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // Bookmark Manager - localStorage ONLY (No API)
+    const BookmarkManager = {
+        STORAGE_KEY: 'event_bookmarks',
+        
+        getBookmarks() {
+            const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+            return bookmarks ? JSON.parse(bookmarks) : [];
+        },
+        
+        saveBookmarks(bookmarks) {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks));
+        },
+        
+        toggle(eventId) {
+            const bookmarks = this.getBookmarks();
+            const index = bookmarks.indexOf(eventId);
+            if (index > -1) {
+                bookmarks.splice(index, 1);
+                this.saveBookmarks(bookmarks);
+                return false;
+            } else {
+                bookmarks.push(eventId);
+                this.saveBookmarks(bookmarks);
+                return true;
+            }
+        },
+        
+        isBookmarked(eventId) {
+            return this.getBookmarks().includes(eventId);
+        }
+    };
 
-    async function toggleBookmarkCard(eventId, button, event) {
+    function toggleBookmarkCard(eventId, button, event) {
+        console.log('🔖 Bookmark card clicked!', eventId);
         event.preventDefault();
         event.stopPropagation();
         
-        const isBookmarked = button.dataset.bookmarked === 'true';
-
-        try {
-            const response = await fetch(`/participant/bookmarks/${eventId}/toggle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({
-                    category: 'saved'
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Toggle UI
-                if (data.bookmarked) {
-                    button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
-                    button.classList.add('bg-red-600', 'text-white');
-                    button.dataset.bookmarked = 'true';
-                    button.title = 'Remove bookmark';
-                    showToast('Bookmarked! 🎉', 'success');
-                } else {
-                    button.classList.remove('bg-red-600', 'text-white');
-                    button.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100');
-                    button.dataset.bookmarked = 'false';
-                    button.title = 'Bookmark this event';
-                    showToast('Bookmark removed', 'info');
-                }
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            showToast('Failed to bookmark', 'error');
+        const isBookmarked = BookmarkManager.toggle(eventId);
+        
+        // Update UI
+        if (isBookmarked) {
+            button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+            button.classList.add('bg-red-600', 'text-white');
+            button.dataset.bookmarked = 'true';
+            button.title = 'Remove bookmark';
+            showToast('Bookmarked! 🎉', 'success');
+        } else {
+            button.classList.remove('bg-red-600', 'text-white');
+            button.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+            button.dataset.bookmarked = 'false';
+            button.title = 'Bookmark this event';
+            showToast('Bookmark removed', 'info');
         }
     }
 
@@ -351,6 +534,23 @@
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    // Initialize bookmarks on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('✅ Initializing explore bookmarks...');
+        
+        document.querySelectorAll('.bookmark-btn-card').forEach(btn => {
+            const eventId = parseInt(btn.dataset.eventId);
+            
+            if (eventId && window.BookmarkManager.isBookmarked(eventId)) {
+                btn.classList.remove('bg-white', 'text-gray-700');
+                btn.classList.add('bg-red-600', 'text-white');
+                btn.setAttribute('data-bookmarked', 'true');
+            }
+        });
+        
+        console.log('✅ Bookmarks initialized!');
+    });
 </script>
 
 @endsection

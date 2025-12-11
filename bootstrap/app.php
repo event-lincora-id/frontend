@@ -13,8 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
-            'organizer.scope' => \App\Http\Middleware\OrganizerScopeMiddleware::class,
+            'guest' => \App\Http\Middleware\GuestMiddleware::class,
+            'api.auth' => \App\Http\Middleware\ApiAuthMiddleware::class,
+            'api.role' => \App\Http\Middleware\ApiRoleMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

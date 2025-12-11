@@ -2,241 +2,184 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Event;
-use App\Models\EventBookmark;
-use App\Services\NotificationService;
+use App\Services\BackendApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 
 class BookmarkController extends Controller
 {
-    protected $notificationService;
+    protected BackendApiService $api;
 
-    public function __construct(NotificationService $notificationService)
+    public function __construct(BackendApiService $api)
     {
-        $this->notificationService = $notificationService;
+        $this->api = $api;
     }
 
-    /**
-     * Display user's bookmarked events
-     */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        $query = EventBookmark::with(['event.category', 'event.organizer'])
-            ->where('user_id', $user->id);
-
-        // Filter by category
-        if ($request->has('category') && $request->category) {
-            $query->where('category', $request->category);
-        }
-
-        // Filter upcoming/past
-        if ($request->has('filter')) {
-            if ($request->filter === 'upcoming') {
-                $query->upcoming();
-            } elseif ($request->filter === 'past') {
-                $query->past();
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return redirect()->route('login');
             }
-        }
+            
+            // Get all published events for bookmark filtering in frontend
+            $eventsResponse = $this->api->withToken($token)->get('events', [
+                'status' => 'published',
+                'per_page' => 100
+            ]);
+            
+            $allEvents = collect($eventsResponse['data'] ?? []);
+            
+            $categories = ['saved', 'upcoming', 'past', 'interested'];
+            
+            // Counts will be calculated in frontend from localStorage
+            $counts = [
+                'all' => 0,
+                'saved' => 0,
+                'upcoming' => 0,
+                'past' => 0,
+                'interested' => 0,
+            ];
 
-        $bookmarks = $query->orderBy('created_at', 'desc')->paginate(12);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $allEvents,
+                    'counts' => $counts
+                ]);
+            }
 
-        // Get categories for filter
-        $categories = ['saved', 'upcoming', 'past', 'interested'];
-        
-        // Count per category
-        $counts = [
-            'all' => EventBookmark::where('user_id', $user->id)->count(),
-            'saved' => EventBookmark::where('user_id', $user->id)->where('category', 'saved')->count(),
-            'upcoming' => EventBookmark::where('user_id', $user->id)->upcoming()->count(),
-            'past' => EventBookmark::where('user_id', $user->id)->past()->count(),
-            'interested' => EventBookmark::where('user_id', $user->id)->where('category', 'interested')->count(),
-        ];
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'success' => true,
-                'data' => $bookmarks,
-                'counts' => $counts
+            return view('participant.bookmarks.index', compact('allEvents', 'categories', 'counts'));
+            
+        } catch (\Exception $e) {
+            Log::error('Bookmark index error: ' . $e->getMessage());
+            
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+            
+            return view('participant.bookmarks.index', [
+                'allEvents' => collect([]),
+                'categories' => ['saved', 'upcoming', 'past', 'interested'],
+                'counts' => [
+                    'all' => 0,
+                    'saved' => 0,
+                    'upcoming' => 0,
+                    'past' => 0,
+                    'interested' => 0,
+                ],
+                'error' => 'Tidak dapat memuat bookmark: ' . $e->getMessage()
             ]);
         }
-
-        return view('participant.bookmarks.index', compact('bookmarks', 'categories', 'counts'));
     }
 
-    /**
-     * Bookmark an event
-     */
-    public function store(Request $request, Event $event): JsonResponse
+    public function store(Request $request, $eventId): JsonResponse
     {
-        $user = $request->user();
-
-        $request->validate([
-            'category' => 'nullable|in:saved,upcoming,past,interested',
-            'notes' => 'nullable|string|max:500'
-        ]);
-
-        // Check if already bookmarked
-        $existing = EventBookmark::where('user_id', $user->id)
-            ->where('event_id', $event->id)
-            ->first();
-
-        if ($existing) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Event sudah di-bookmark sebelumnya'
-            ], 400);
-        }
-
-        // Create bookmark
-        $bookmark = EventBookmark::create([
-            'user_id' => $user->id,
-            'event_id' => $event->id,
-            'category' => $request->category ?? 'saved',
-            'notes' => $request->notes,
-        ]);
-
-        // Send notification
-        $categories = $this->getCategoryLabels([$request->category ?? 'saved']);
-        $this->notificationService->sendBookmarkNotification($user, $event, $categories);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Event berhasil di-bookmark',
-            'data' => $bookmark
-        ]);
-    }
-
-    /**
-     * Update bookmark (change category or notes)
-     */
-    public function update(Request $request, EventBookmark $bookmark): JsonResponse
-    {
-        $user = $request->user();
-
-        if ($bookmark->user_id !== $user->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
-        }
-
-        $request->validate([
-            'category' => 'nullable|in:saved,upcoming,past,interested',
-            'notes' => 'nullable|string|max:500'
-        ]);
-
-        $bookmark->update($request->only(['category', 'notes']));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Bookmark berhasil diupdate',
-            'data' => $bookmark
-        ]);
-    }
-
-    /**
-     * Remove bookmark
-     */
-    public function destroy(Request $request, Event $event): JsonResponse
-    {
-        $user = $request->user();
-
-        $bookmark = EventBookmark::where('user_id', $user->id)
-            ->where('event_id', $event->id)
-            ->first();
-
-        if (!$bookmark) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bookmark tidak ditemukan'
-            ], 404);
-        }
-
-        $bookmark->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Bookmark berhasil dihapus'
-        ]);
-    }
-
-    /**
-     * Toggle bookmark (add if not exists, remove if exists)
-     */
-    public function toggle(Request $request, Event $event): JsonResponse
-    {
-        $user = $request->user();
-
-        $bookmark = EventBookmark::where('user_id', $user->id)
-            ->where('event_id', $event->id)
-            ->first();
-
-        if ($bookmark) {
-            // Remove bookmark
-            $bookmark->delete();
+        try {
+            $token = Session::get('api_token');
             
-            return response()->json([
-                'success' => true,
-                'message' => 'Bookmark dihapus',
-                'bookmarked' => false
-            ]);
-        } else {
-            // Add bookmark
-            $category = $request->category ?? 'saved';
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
             
-            $bookmark = EventBookmark::create([
-                'user_id' => $user->id,
-                'event_id' => $event->id,
-                'category' => $category,
+            $response = $this->api->withToken($token)->post("bookmarks/{$eventId}", [
+                'category' => $request->category ?? 'saved',
                 'notes' => $request->notes,
             ]);
 
-            // Send notification
-            $categories = $this->getCategoryLabels([$category]);
-            $this->notificationService->sendBookmarkNotification($user, $event, $categories);
-
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            Log::error('Bookmark store error: ' . $e->getMessage());
             return response()->json([
-                'success' => true,
-                'message' => 'Event di-bookmark',
-                'bookmarked' => true,
-                'data' => $bookmark
-            ]);
+                'success' => false,
+                'message' => 'Gagal membuat bookmark: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    /**
-     * Check if event is bookmarked
-     */
-    public function check(Request $request, Event $event): JsonResponse
+    public function destroy(Request $request, $eventId): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+            
+            $response = $this->api->withToken($token)->delete("bookmarks/{$eventId}");
 
-        $bookmark = EventBookmark::where('user_id', $user->id)
-            ->where('event_id', $event->id)
-            ->first();
-
-        return response()->json([
-            'success' => true,
-            'bookmarked' => $bookmark !== null,
-            'data' => $bookmark
-        ]);
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            Log::error('Bookmark destroy error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus bookmark: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    /**
-     * Get category labels
-     */
-    private function getCategoryLabels($categories)
+    public function toggle(Request $request, $eventId): JsonResponse
     {
-        $labels = [
-            'saved' => 'Disimpan',
-            'upcoming' => 'Mendatang',
-            'past' => 'Telah Lewat',
-            'interested' => 'Tertarik'
-        ];
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+            
+            $response = $this->api->withToken($token)->post("bookmarks/{$eventId}/toggle");
 
-        return array_map(fn($cat) => $labels[$cat] ?? $cat, $categories);
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            Log::error('Bookmark toggle error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal toggle bookmark: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function check(Request $request, $eventId): JsonResponse
+    {
+        try {
+            $token = Session::get('api_token');
+            
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+            
+            $response = $this->api->withToken($token)->get("bookmarks/{$eventId}/check");
+
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            Log::error('Bookmark check error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -73,7 +73,7 @@
                         <p class="text-gray-600">@yield('page-description', 'Welcome back! Here\'s what\'s happening with your events.')</p>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span class="text-sm text-gray-600">Welcome, {{ Auth::user()->name }}</span>
+                        <span class="text-sm text-gray-600">Welcome, {{ session('user')['full_name'] ?? session('user')['name'] ?? 'User' }}</span>
                         <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background-color: var(--color-primary);">
                             <i class="fas fa-user text-white text-sm"></i>
                         </div>

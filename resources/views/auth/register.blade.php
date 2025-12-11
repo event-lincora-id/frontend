@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Register - Event Connect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -39,95 +40,92 @@
                 <h2 class="text-3xl font-extrabold text-gray-900">Buat Akun</h2>
                 <p class="mt-1 text-sm text-gray-500">Daftar sebagai Event Organizer atau Participant</p>
 
-        <form class="mt-8 space-y-6" method="POST" action="{{ route('register') }}">
-            @csrf
-            <div class="space-y-4">
-                <div>
-                    <label for="full_name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
-                    <input id="full_name" name="full_name" type="text" autocomplete="name" required 
-                           class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('full_name') border-red-500 @enderror" 
-                           placeholder="Nama lengkap" value="{{ old('full_name') }}">
-                    @error('full_name')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
+                @if($errors->any())
+                    <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        @foreach($errors->all() as $error)
+                            <p class="text-sm">{{ $error }}</p>
+                        @endforeach
+                    </div>
+                @endif
 
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required 
-                           class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('email') border-red-500 @enderror" 
-                           placeholder="lorem@gmail.com" value="{{ old('email') }}">
-                    @error('email')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
-                    <select id="role" name="role" required 
-                            class="mt-2 block w-full rounded-lg border border-gray-200 bg-white ring-1 ring-gray-100 px-3 py-2.5 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm @error('role') border-red-500 @enderror">
-                        <option value="">Pilih role</option>
-                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Event Organizer</option>
-                        <option value="participant" {{ old('role') == 'participant' ? 'selected' : '' }}>Participant</option>
-                    </select>
-                    @error('role')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="new-password" required 
-                           class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('password') border-red-500 @enderror" 
-                           placeholder="••••••••">
-                    @error('password')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Confirm Password</label>
-                    <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required 
-                           class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition" 
-                           placeholder="Ulangi password">
-                </div>
-            </div>
-
-            <!-- Role Information -->
-            <div class="bg-[#F4B6B6]/15 border border-[#F4B6B6]/40 rounded-md p-4">
-                <h3 class="text-sm font-medium text-[#4B0F0F] mb-2">Informasi Role:</h3>
-                <div class="space-y-2 text-sm text-[#4B0F0F]/80">
-                    <div class="flex items-start">
-                        <i class="fas fa-crown text-[#4B0F0F] mt-0.5 mr-2"></i>
+                <form class="mt-8 space-y-6" method="POST" action="{{ route('register') }}">
+                    @csrf
+                    <div class="space-y-4">
                         <div>
-                            <strong>Event Organizer:</strong> Akses penuh ke dashboard, manajemen pengguna, event, dan analitik.
+                            <label for="full_name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                            <input id="full_name" name="full_name" type="text" autocomplete="name" required 
+                                   class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('full_name') border-red-500 @enderror" 
+                                   placeholder="Mulyadi Al Amin" value="{{ old('full_name') }}">
+                            @error('full_name')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input id="email" name="email" type="email" autocomplete="email" required 
+                                   class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('email') border-red-500 @enderror" 
+                                   placeholder="tawonndazz57@gmail.com" value="{{ old('email') }}">
+                            @error('email')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
+                            <select id="role" name="role" required 
+                                    class="mt-2 block w-full rounded-lg border border-gray-200 bg-white ring-1 ring-gray-100 px-3 py-2.5 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm @error('role') border-red-500 @enderror">
+                                <option value="">Pilih role</option>
+                                <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Event Organizer</option>
+                                <option value="participant" {{ old('role') == 'participant' ? 'selected' : '' }}>Participant</option>
+                            </select>
+                            @error('role')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                            <input id="password" name="password" type="password" autocomplete="new-password" required 
+                                   class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('password') border-red-500 @enderror" 
+                                   placeholder="••••••••">
+                            @error('password')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                            <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required 
+                                   class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition" 
+                                   placeholder="Ulangi password">
                         </div>
                     </div>
-                    <div class="flex items-start">
-                        <i class="fas fa-users text-[#4B0F0F] mt-0.5 mr-2"></i>
-                        <div>
-                            <strong>Participant:</strong> Bisa ikut event, beri feedback, unduh sertifikat, dan kelola profil.
+
+                    <!-- Role Information -->
+                    <div class="bg-[#F4B6B6]/15 border border-[#F4B6B6]/40 rounded-md p-4">
+                        <h3 class="text-sm font-medium text-[#4B0F0F] mb-2">Informasi Role:</h3>
+                        <div class="space-y-2 text-sm text-[#4B0F0F]/80">
+                            <div class="flex items-start">
+                                <i class="fas fa-user-tie text-[#4B0F0F] mr-2 mt-0.5"></i>
+                                <span><strong>Event Organizer:</strong> Akses penuh ke dashboard manajemen, pengguna, event, dan analitik.</span>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-users text-[#4B0F0F] mr-2 mt-0.5"></i>
+                                <span><strong>Participant:</strong> Ikut event, beri feedback, untuk dan kirim feedback, dan lihat profil.</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div>
-                <button type="submit" 
-                        class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6] hover:bg-[#ef9fa0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F4B6B6] shadow-sm">
-                    Buat Akun
-                </button>
-            </div>
+                    <button type="submit" 
+                            class="w-full py-3 px-4 rounded-lg text-white font-semibold bg-[#F4B6B6] hover:bg-[#ef9fa0] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F4B6B6] shadow-sm transition">
+                        Buat Akun
+                    </button>
 
-            <div class="text-center">
-                <p class="text-sm text-gray-600">
-                    Sudah punya akun?
-                    <a href="{{ route('login') }}" class="font-medium text-[#4B0F0F] hover:underline">
-                        Masuk di sini
-                    </a>
-                </p>
-            </div>
-        </form>
+                    <p class="text-center text-xs text-gray-500">
+                        Sudah punya akun? <a href="{{ route('login') }}" class="underline hover:text-gray-700">Masuk di sini</a>
+                    </p>
+                </form>
             </div>
         </div>
     </div>

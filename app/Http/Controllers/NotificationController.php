@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Notification;
-use App\Services\NotificationService;
+use App\Services\BackendApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Session;
 
 class NotificationController extends Controller
 {
-    protected $notificationService;
+    protected BackendApiService $api;
 
-    public function __construct(NotificationService $notificationService)
+    public function __construct(BackendApiService $api)
     {
-        $this->notificationService = $notificationService;
+        $this->api = $api;
     }
 
     /**
@@ -21,37 +21,70 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        $query = Notification::with(['event'])
-            ->where('user_id', $user->id);
+        try {
+            $token = Session::get('api_token');
+            $user = Session::get('user');
 
-        // Filter by type if specified
-        if ($request->has('type') && $request->type) {
-            $query->where('type', $request->type);
-        }
+            if (!$token || !$user) {
+                return redirect()->route('login');
+            }
 
-        // Filter by read status
-        if ($request->has('unread_only') && $request->boolean('unread_only')) {
-            $query->unread();
-        }
+            // Get notifications from API
+            $params = [];
+            if ($request->has('type') && $request->type) {
+                $params['type'] = $request->type;
+            }
+            if ($request->has('unread_only') && $request->boolean('unread_only')) {
+                $params['unread_only'] = true;
+            }
+            
+            // Add pagination params
+            $params['page'] = $request->get('page', 1);
+            $params['per_page'] = 20;
 
-        $notifications = $query->orderBy('created_at', 'desc')->paginate(20);
+            $response = $this->api->withToken($token)->get('notifications', $params);
+            
+            // Check if API returns paginated data or simple array
+            if (isset($response['data']['data']) && isset($response['data']['pagination'])) {
+                // API returns paginated data
+                $notifications = collect($response['data']['data']);
+                $pagination = $response['data']['pagination'];
+            } else {
+                // API returns simple array
+                $notifications = collect($response['data'] ?? []);
+                $pagination = null;
+            }
 
-        // Return JSON for testing purposes or if requested via AJAX
-        if ($request->wantsJson() || $request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'data' => $notifications
+            // Return JSON for AJAX requests
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $notifications,
+                    'pagination' => $pagination
+                ]);
+            }
+
+            // Determine which view to return based on user role
+            if (in_array($user['role'] ?? '', ['admin', 'super_admin'])) {
+                return view('admin.notifications.index', compact('notifications', 'pagination'));
+            }
+
+            return view('participant.notifications.index', compact('notifications', 'pagination'));
+
+        } catch (\Exception $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+            }
+
+            return view('participant.notifications.index', [
+                'notifications' => collect([]),
+                'pagination' => null,
+                'error' => 'Gagal memuat notifikasi: ' . $e->getMessage()
             ]);
         }
-
-        // Determine which view to return based on user role
-        if ($user->role === 'admin') {
-            return view('admin.notifications.index', compact('notifications'));
-        }
-
-        return view('participant.notifications.index', compact('notifications'));
     }
 
     /**
@@ -59,38 +92,59 @@ class NotificationController extends Controller
      */
     public function unreadCount(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $token = Session::get('api_token');
 
-        $count = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->count();
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
 
-        return response()->json([
-            'success' => true,
-            'count' => $count
-        ]);
+            $response = $this->api->withToken($token)->get('notifications/unread-count');
+
+            return response()->json([
+                'success' => true,
+                'count' => $response['count'] ?? 0
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Mark notification as read (AJAX)
      */
-    public function markAsRead(Request $request, Notification $notification): JsonResponse
+    public function markAsRead(Request $request, $notification): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $token = Session::get('api_token');
 
-        if ($notification->user_id !== $user->id) {
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->post("notifications/{$notification}/read");
+
+            return response()->json([
+                'success' => true,
+                'message' => $response['message'] ?? 'Notifikasi telah dibaca'
+            ]);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        $notification->update(['is_read' => true]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Notifikasi telah dibaca'
-        ]);
     }
 
     /**
@@ -98,38 +152,59 @@ class NotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $token = Session::get('api_token');
 
-        $updated = Notification::where('user_id', $user->id)
-            ->where('is_read', false)
-            ->update(['is_read' => true]);
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Semua notifikasi telah dibaca',
-            'updated_count' => $updated
-        ]);
+            $response = $this->api->withToken($token)->post('notifications/mark-all-read');
+
+            return response()->json([
+                'success' => true,
+                'message' => $response['message'] ?? 'Semua notifikasi telah dibaca',
+                'updated_count' => $response['updated_count'] ?? 0
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Delete notification (AJAX)
      */
-    public function destroy(Request $request, Notification $notification): JsonResponse
+    public function destroy(Request $request, $notification): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $token = Session::get('api_token');
 
-        if ($notification->user_id !== $user->id) {
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Not authenticated'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->delete("notifications/{$notification}");
+
+            return response()->json([
+                'success' => true,
+                'message' => $response['message'] ?? 'Notifikasi berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        $notification->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Notifikasi berhasil dihapus'
-        ]);
     }
 }
