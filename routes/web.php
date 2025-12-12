@@ -1,40 +1,5 @@
 <?php
 
-Route::get('/test-api', function () {
-    try {
-        $api = app(\App\Services\BackendApiService::class);
-        
-        // Test 1: Get all events (no filter)
-        $response1 = $api->get('events');
-        
-        // Test 2: Get categories
-        $response2 = $api->get('categories');
-        
-        // Test 3: Get events with published filter
-        $response3 = $api->get('events', ['status' => 'published']);
-        
-        return response()->json([
-            'events_no_filter' => [
-                'count' => count($response1['data']['data'] ?? []),
-                'total' => $response1['data']['total'] ?? null,
-                'message' => $response1['message'] ?? null,
-            ],
-            'categories' => [
-                'count' => count($response2['data'] ?? []),
-                'data' => $response2['data'] ?? [],
-            ],
-            'events_published_filter' => [
-                'count' => count($response3['data']['data'] ?? []),
-                'total' => $response3['data']['total'] ?? null,
-                'first_event' => $response3['data']['data'][0] ?? null,
-            ],
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-});
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\ParticipantDashboardController;
