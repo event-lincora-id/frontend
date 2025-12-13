@@ -1,8 +1,6 @@
-@extends('participant.layout')
+<?php $__env->startSection('title', 'Dashboard - Event Connect'); ?>
 
-@section('title', 'Dashboard - Event Connect')
-
-@section('content')
+<?php $__env->startSection('content'); ?>
 <div class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <!-- Header -->
@@ -11,11 +9,12 @@
             <p class="mt-2 text-gray-600">Manage your event participations and activities</p>
         </div>
 
-        @if(isset($error))
+        <?php if(isset($error)): ?>
         <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            <i class="fas fa-exclamation-circle mr-2"></i>{{ $error }}
+            <i class="fas fa-exclamation-circle mr-2"></i><?php echo e($error); ?>
+
         </div>
-        @endif
+        <?php endif; ?>
 
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -30,7 +29,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Events Joined</dt>
-                                <dd class="text-2xl font-bold text-gray-900">{{ $stats['total_registered'] }}</dd>
+                                <dd class="text-2xl font-bold text-gray-900"><?php echo e($stats['total_registered']); ?></dd>
                             </dl>
                         </div>
                     </div>
@@ -48,7 +47,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Events Attended</dt>
-                                <dd class="text-2xl font-bold text-gray-900">{{ $stats['attended_events'] }}</dd>
+                                <dd class="text-2xl font-bold text-gray-900"><?php echo e($stats['attended_events']); ?></dd>
                             </dl>
                         </div>
                     </div>
@@ -66,7 +65,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Upcoming Events</dt>
-                                <dd class="text-2xl font-bold text-gray-900">{{ $stats['upcoming_events'] }}</dd>
+                                <dd class="text-2xl font-bold text-gray-900"><?php echo e($stats['upcoming_events']); ?></dd>
                             </dl>
                         </div>
                     </div>
@@ -85,12 +84,12 @@
                             <button onclick="switchTab('upcoming')" id="tab-upcoming" class="tab-button active flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-red-600 text-red-600">
                                 <i class="fas fa-calendar"></i>
                                 Upcoming
-                                <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs">{{ $upcomingEvents->count() }}</span>
+                                <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs"><?php echo e($upcomingEvents->count()); ?></span>
                             </button>
                             <button onclick="switchTab('past')" id="tab-past" class="tab-button flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
                                 <i class="fas fa-history"></i>
                                 Past Events
-                                <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{{ $pastEvents->count() }}</span>
+                                <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs"><?php echo e($pastEvents->count()); ?></span>
                             </button>
                         </nav>
                     </div>
@@ -98,28 +97,28 @@
                     <!-- Upcoming Events Tab Content -->
                     <div id="content-upcoming" class="tab-content p-6">
                         <div class="space-y-4">
-                            @forelse ($upcomingEvents as $participant)
-                                @php
+                            <?php $__empty_1 = true; $__currentLoopData = $upcomingEvents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $participant): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                <?php
                                     $event = $participant->event ?? null;
                                     if (!$event) continue;
                                     $startDate = isset($event->start_date) ? \Carbon\Carbon::parse($event->start_date) : null;
-                                @endphp
+                                ?>
                                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                                     <div class="flex items-start justify-between">
                                         <div class="flex-1">
-                                            <h4 class="text-lg font-semibold text-gray-900 mb-2">{{ $event->title ?? 'No Title' }}</h4>
+                                            <h4 class="text-lg font-semibold text-gray-900 mb-2"><?php echo e($event->title ?? 'No Title'); ?></h4>
                                             <div class="space-y-1 text-sm text-gray-600">
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-calendar text-red-500 w-4"></i>
-                                                    <span>{{ $startDate ? $startDate->format('d M Y') : 'Date TBA' }}</span>
+                                                    <span><?php echo e($startDate ? $startDate->format('d M Y') : 'Date TBA'); ?></span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-clock text-red-500 w-4"></i>
-                                                    <span>{{ $startDate ? $startDate->format('H:i') : '--:--' }} WIB</span>
+                                                    <span><?php echo e($startDate ? $startDate->format('H:i') : '--:--'); ?> WIB</span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-map-marker-alt text-red-500 w-4"></i>
-                                                    <span>{{ $event->location ?? 'Online Event' }}</span>
+                                                    <span><?php echo e($event->location ?? 'Online Event'); ?></span>
                                                 </div>
                                             </div>
                                         </div>
@@ -127,79 +126,79 @@
                                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                                                 <i class="fas fa-check mr-1"></i>Registered
                                             </span>
-                                            <a href="{{ route('events.show', $event->id ?? 0) }}" class="text-red-600 hover:text-red-700 text-sm font-medium">
+                                            <a href="<?php echo e(route('events.show', $event->id ?? 0)); ?>" class="text-red-600 hover:text-red-700 text-sm font-medium">
                                                 View Details <i class="fas fa-arrow-right ml-1"></i>
                                             </a>
                                         </div>
                                     </div>
                                 </div>
-                            @empty
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <div class="text-center py-12">
                                     <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <i class="fas fa-calendar-alt text-3xl text-gray-400"></i>
                                     </div>
                                     <p class="text-gray-500 mb-4">You haven't joined any upcoming events yet.</p>
-                                    <a href="{{ route('events.index') }}" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                    <a href="<?php echo e(route('events.index')); ?>" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
                                         <i class="fas fa-search mr-2"></i>Browse Events
                                     </a>
                                 </div>
-                            @endforelse
+                            <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- Past Events Tab Content -->
                     <div id="content-past" class="tab-content hidden p-6">
                         <div class="space-y-4">
-                            @forelse ($pastEvents as $participant)
-                                @php
+                            <?php $__empty_1 = true; $__currentLoopData = $pastEvents; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $participant): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                                <?php
                                     $event = $participant->event ?? null;
                                     if (!$event) continue;
                                     $startDate = isset($event->start_date) ? \Carbon\Carbon::parse($event->start_date) : null;
                                     $status = $participant->status ?? 'registered';
-                                @endphp
+                                ?>
                                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                                     <div class="flex items-start justify-between">
                                         <div class="flex-1">
-                                            <h4 class="text-lg font-semibold text-gray-900 mb-2">{{ $event->title ?? 'No Title' }}</h4>
+                                            <h4 class="text-lg font-semibold text-gray-900 mb-2"><?php echo e($event->title ?? 'No Title'); ?></h4>
                                             <div class="space-y-1 text-sm text-gray-600">
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-calendar text-red-500 w-4"></i>
-                                                    <span>{{ $startDate ? $startDate->format('d M Y') : 'Date TBA' }}</span>
+                                                    <span><?php echo e($startDate ? $startDate->format('d M Y') : 'Date TBA'); ?></span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-clock text-red-500 w-4"></i>
-                                                    <span>{{ $startDate ? $startDate->format('H:i') : '--:--' }} WIB</span>
+                                                    <span><?php echo e($startDate ? $startDate->format('H:i') : '--:--'); ?> WIB</span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <i class="fas fa-map-marker-alt text-red-500 w-4"></i>
-                                                    <span>{{ $event->location ?? 'Online Event' }}</span>
+                                                    <span><?php echo e($event->location ?? 'Online Event'); ?></span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="flex flex-col items-end gap-2 ml-4">
-                                            @if($status === 'attended')
+                                            <?php if($status === 'attended'): ?>
                                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                                                     <i class="fas fa-check-circle mr-1"></i>Attended
                                                 </span>
-                                            @else
+                                            <?php else: ?>
                                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
                                                     <i class="fas fa-times-circle mr-1"></i>Not Attended
                                                 </span>
-                                            @endif
-                                            <a href="{{ route('events.show', $event->id ?? 0) }}" class="text-red-600 hover:text-red-700 text-sm font-medium">
+                                            <?php endif; ?>
+                                            <a href="<?php echo e(route('events.show', $event->id ?? 0)); ?>" class="text-red-600 hover:text-red-700 text-sm font-medium">
                                                 View Details <i class="fas fa-arrow-right ml-1"></i>
                                             </a>
                                         </div>
                                     </div>
                                 </div>
-                            @empty
+                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                                 <div class="text-center py-12">
                                     <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <i class="fas fa-history text-3xl text-gray-400"></i>
                                     </div>
                                     <p class="text-gray-500">No past events yet.</p>
                                 </div>
-                            @endforelse
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -214,13 +213,13 @@
                     </div>
                     <div class="p-6">
                         <div class="space-y-3">
-                            <a href="{{ route('events.index') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors shadow-md">
+                            <a href="<?php echo e(route('events.index')); ?>" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors shadow-md">
                                 <i class="fas fa-search mr-2"></i>Browse Events
                             </a>
-                            <a href="{{ route('my.participations') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md">
+                            <a href="<?php echo e(route('my.participations')); ?>" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md">
                                 <i class="fas fa-qrcode mr-2"></i>My QR Codes
                             </a>
-                            <a href="{{ route('participant.profile') }}" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <a href="<?php echo e(route('participant.profile')); ?>" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                                 <i class="fas fa-user mr-2"></i>Edit Profile
                             </a>
                             <a href="#" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -236,7 +235,7 @@
                     <h3 class="text-lg font-semibold text-gray-900">Payment History</h3>
                 </div>
                 <div class="p-6">
-                    @if(isset($paymentHistory) && $paymentHistory->count() > 0)
+                    <?php if(isset($paymentHistory) && $paymentHistory->count() > 0): ?>
                         <!-- Warning Message -->
                         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
                             <div class="flex items-center">
@@ -257,8 +256,8 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($paymentHistory->take(3) as $payment)
-                                        @php
+                                    <?php $__currentLoopData = $paymentHistory->take(3); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $payment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <?php
                                             $event = $payment->event ?? null;
                                             $paymentInfo = $payment->payment ?? null;
                                             $participationId = $payment->id ?? null;
@@ -268,81 +267,83 @@
                                             $status = strtolower($paymentInfo->status ?? 'pending');
                                             $amount = $paymentInfo->amount ?? ($event->price ?? 0);
                                             $isPaid = $paymentInfo->is_paid ?? false;
-                                        @endphp
+                                        ?>
                                         <tr>
                                             <!-- Event Column -->
                                             <td class="px-4 py-4 whitespace-nowrap">
                                                 <div class="flex flex-col">
-                                                    <div class="text-sm font-medium text-gray-900">{{ $event->title ?? 'Unknown Event' }}</div>
+                                                    <div class="text-sm font-medium text-gray-900"><?php echo e($event->title ?? 'Unknown Event'); ?></div>
                                                     <div class="text-xs text-gray-500">
                                                         <i class="fas fa-calendar mr-1"></i>
-                                                        {{ isset($event->start_date) ? \Carbon\Carbon::parse($event->start_date)->format('d M Y') : 'N/A' }}
+                                                        <?php echo e(isset($event->start_date) ? \Carbon\Carbon::parse($event->start_date)->format('d M Y') : 'N/A'); ?>
+
                                                     </div>
                                                 </div>
                                             </td>
 
                                             <!-- Amount Column -->
                                             <td class="px-4 py-4 whitespace-nowrap">
-                                                <div class="text-sm font-semibold text-gray-900">Rp {{ number_format($amount, 0, ',', '.') }}</div>
+                                                <div class="text-sm font-semibold text-gray-900">Rp <?php echo e(number_format($amount, 0, ',', '.')); ?></div>
                                             </td>
 
                                             <!-- Status Column -->
                                             <td class="px-4 py-4 whitespace-nowrap">
-                                                @if($status === 'paid')
+                                                <?php if($status === 'paid'): ?>
                                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                                                         <i class="fas fa-check-circle mr-1"></i>Paid
                                                     </span>
-                                                @elseif($status === 'pending')
+                                                <?php elseif($status === 'pending'): ?>
                                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
                                                         <i class="fas fa-clock mr-1"></i>Pending
                                                     </span>
-                                                @elseif($status === 'failed')
+                                                <?php elseif($status === 'failed'): ?>
                                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
                                                         <i class="fas fa-times-circle mr-1"></i>Failed
                                                     </span>
-                                                @else
+                                                <?php else: ?>
                                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
-                                                        {{ ucfirst($status) }}
+                                                        <?php echo e(ucfirst($status)); ?>
+
                                                     </span>
-                                                @endif
+                                                <?php endif; ?>
                                             </td>
 
                                             <!-- Actions Column -->
                                             <td class="px-4 py-4 whitespace-nowrap text-sm">
-                                                @if($status === 'pending' && $participationId)
+                                                <?php if($status === 'pending' && $participationId): ?>
                                                     <div class="flex items-center gap-2">
-                                                        <button onclick="showPaymentModalForParticipant({{ $participationId }}, '{{ $event->title ?? '' }}', {{ $amount }})"
+                                                        <button onclick="showPaymentModalForParticipant(<?php echo e($participationId); ?>, '<?php echo e($event->title ?? ''); ?>', <?php echo e($amount); ?>)"
                                                                 class="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors">
                                                             <i class="fas fa-credit-card mr-1"></i>Confirm
                                                         </button>
-                                                        <button onclick="cancelPayment({{ $participationId }})"
+                                                        <button onclick="cancelPayment(<?php echo e($participationId); ?>)"
                                                                 class="inline-flex items-center px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors">
                                                             <i class="fas fa-times mr-1"></i>Cancel
                                                         </button>
                                                     </div>
-                                                @elseif($status === 'paid')
+                                                <?php elseif($status === 'paid'): ?>
                                                     <span class="text-xs text-gray-500">No action needed</span>
-                                                @else
+                                                <?php else: ?>
                                                     <span class="text-xs text-gray-500">-</span>
-                                                @endif
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
-                                    @endforeach
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                 </tbody>
                             </table>
                         </div>
-                    @else
+                    <?php else: ?>
                         <!-- Empty State -->
                         <div class="text-center py-12">
                             <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <i class="fas fa-receipt text-3xl text-gray-400"></i>
                             </div>
                             <p class="text-gray-500 mb-4">No payment history yet.</p>
-                            <a href="{{ route('events.index') }}" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            <a href="<?php echo e(route('events.index')); ?>" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
                                 <i class="fas fa-search mr-2"></i>Browse Paid Events
                             </a>
                         </div>
-                    @endif
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -510,7 +511,7 @@
     </div>
 </div>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script>
 // Bookmark Management with localStorage
 const BookmarkManager = {
@@ -567,7 +568,7 @@ async function loadBookmarkedEvents() {
                     <i class="fas fa-bookmark text-3xl text-gray-400"></i>
                 </div>
                 <p class="text-gray-500 mb-4">No bookmarked events yet.</p>
-                <a href="{{ route('events.index') }}" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                <a href="<?php echo e(route('events.index')); ?>" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
                     <i class="fas fa-search mr-2"></i>Discover Events
                 </a>
             </div>
@@ -581,7 +582,7 @@ async function loadBookmarkedEvents() {
         // Fetch event details for each bookmarked event
         const eventPromises = bookmarkIds.slice(0, 3).map(async (eventId) => {
             try {
-                const response = await fetch(`{{ config('services.backend.base_url') }}/events/${eventId}`);
+                const response = await fetch(`<?php echo e(config('services.backend.base_url')); ?>/events/${eventId}`);
                 if (!response.ok) throw new Error('Event not found');
                 const data = await response.json();
                 return data.data;
@@ -638,7 +639,7 @@ async function loadBookmarkedEvents() {
         if (bookmarkIds.length > 3) {
             container.innerHTML += `
                 <div class="mt-4 text-center">
-                    <a href="{{ route('events.index') }}" class="text-red-600 hover:text-red-700 font-medium">
+                    <a href="<?php echo e(route('events.index')); ?>" class="text-red-600 hover:text-red-700 font-medium">
                         View All Bookmarks (${bookmarkIds.length}) <i class="fas fa-arrow-right ml-1"></i>
                     </a>
                 </div>
@@ -705,8 +706,8 @@ let currentParticipantId = null;
 
 // Get CSRF token and API token
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-const apiBaseUrl = '{{ config('services.backend.base_url') }}';
-const apiToken = '{{ Session::get('api_token') }}';
+const apiBaseUrl = '<?php echo e(config('services.backend.base_url')); ?>';
+const apiToken = '<?php echo e(Session::get('api_token')); ?>';
 
 // Show payment modal for a specific participant
 function showPaymentModalForParticipant(participantId, eventTitle, amount) {
@@ -880,6 +881,7 @@ document.addEventListener('click', function(event) {
     }
 });
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
 
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('participant.layout', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Study\Kuliah\Semester-7\CP\event-connect\resources\views/participant/dashboard.blade.php ENDPATH**/ ?>
