@@ -243,7 +243,7 @@ class EventController extends Controller
     {
         try {
             $token = Session::get('api_token');
-            
+
             $response = $this->api->withToken($token)->get("events/{$id}");
             $eventData = $response['data'] ?? null;
 
@@ -254,7 +254,17 @@ class EventController extends Controller
 
             $event = $this->arrayToObject($eventData);
 
-            return view('admin.events.show', compact('event'));
+            // Fetch participants data
+            try {
+                $participantsResponse = $this->api->withToken($token)->get("events/{$id}/participants");
+                $participantsData = $participantsResponse['data']['data'] ?? $participantsResponse['data'] ?? [];
+            } catch (\Exception $e) {
+                $participantsData = [];
+            }
+
+            $participants = array_map(fn($p) => $this->arrayToObject($p), $participantsData);
+
+            return view('admin.events.show', compact('event', 'participants'));
 
         } catch (\Exception $e) {
             Log::error('Events show error: ' . $e->getMessage());
@@ -525,5 +535,98 @@ class EventController extends Controller
             }
         }
         return $object;
+    }
+
+    public function feedbacks($id)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            // Fetch event details
+            $eventResponse = $this->api->withToken($token)->get("events/{$id}");
+            $eventData = $eventResponse['data'] ?? null;
+
+            if (!$eventData) {
+                return redirect()->route('admin.events.index')
+                    ->with('error', 'Event tidak ditemukan');
+            }
+
+            $event = $this->arrayToObject($eventData);
+
+            // Fetch detailed summary (includes feedbacks, statistics, and AI summary)
+            $feedbacks = [];
+            $stats = null;
+            $summary = null;
+
+            try {
+                $detailedResponse = $this->api->withToken($token)->get("events/{$id}/feedback/summary/detailed");
+                $detailedData = $detailedResponse['data'] ?? [];
+
+                // Extract feedbacks
+                if (isset($detailedData['feedbacks'])) {
+                    $feedbacks = array_map(
+                        fn($f) => $this->arrayToObject($f),
+                        $detailedData['feedbacks']
+                    );
+                }
+
+                // Extract statistics
+                if (isset($detailedData['statistics'])) {
+                    $statsArray = $detailedData['statistics'];
+                    $stats = $this->arrayToObject([
+                        'average_rating' => $statsArray['average_rating'] ?? 0,
+                        'total_feedbacks' => $statsArray['total_feedbacks'] ?? 0,
+                        'rating_1' => $statsArray['rating_distribution']['1_star'] ?? 0,
+                        'rating_2' => $statsArray['rating_distribution']['2_star'] ?? 0,
+                        'rating_3' => $statsArray['rating_distribution']['3_star'] ?? 0,
+                        'rating_4' => $statsArray['rating_distribution']['4_star'] ?? 0,
+                        'rating_5' => $statsArray['rating_distribution']['5_star'] ?? 0,
+                    ]);
+                }
+
+                // Extract AI summary
+                if (isset($detailedData['summary']) && $detailedData['summary']) {
+                    $summary = $this->arrayToObject([
+                        'summary' => $detailedData['summary'],
+                        'generated_at' => $detailedData['generated_at'] ?? null,
+                        'feedback_count' => $detailedData['statistics']['feedback_count_at_summary'] ?? 0,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // If detailed endpoint fails, feedbacks/summary are optional
+                Log::info('Detailed feedback fetch failed (event may have no feedbacks yet): ' . $e->getMessage());
+            }
+
+            return view('admin.events.feedbacks', compact('event', 'feedbacks', 'stats', 'summary'));
+
+        } catch (\Exception $e) {
+            Log::error('Events feedbacks error: ' . $e->getMessage());
+            return redirect()->route('admin.events.index')
+                ->with('error', 'Tidak dapat memuat feedback event');
+        }
+    }
+
+    public function generateSummary($id)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            $response = $this->api->withToken($token)->post("events/{$id}/feedback/generate-summary");
+
+            $success = isset($response['success']) ? $response['success'] : false;
+
+            if ($success) {
+                return redirect()->route('admin.events.feedbacks', $id)
+                    ->with('success', 'AI summary berhasil di-generate!');
+            }
+
+            return redirect()->route('admin.events.feedbacks', $id)
+                ->with('error', $response['message'] ?? 'Gagal generate summary');
+
+        } catch (\Exception $e) {
+            Log::error('Generate summary error: ' . $e->getMessage());
+            return redirect()->route('admin.events.feedbacks', $id)
+                ->with('error', 'Gagal generate summary: ' . $e->getMessage());
+        }
     }
 }

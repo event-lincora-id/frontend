@@ -144,6 +144,8 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
     ]);
     Route::post('/events/{event}/toggle-status', [EventController::class, 'toggleStatus'])->name('admin.events.toggle-status');
     Route::get('/events/{event}/participants', [EventController::class, 'participants'])->name('admin.events.participants');
+    Route::get('/events/{event}/feedbacks', [EventController::class, 'feedbacks'])->name('admin.events.feedbacks');
+    Route::post('/events/{event}/generate-summary', [EventController::class, 'generateSummary'])->name('admin.events.generate-summary');
     Route::get('/events/{event}/qr-code', [AttendanceController::class, 'showQRCode'])->name('attendance.qr-code');
     Route::get('/events/{event}/attendance/participants', [AttendanceController::class, 'getParticipants'])->name('attendance.participants');
     

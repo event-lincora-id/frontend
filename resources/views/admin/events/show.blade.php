@@ -10,9 +10,12 @@
     <div class="px-6 py-4 border-b border-gray-200">
         <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium text-gray-900">{{ $event->title ?? 'Event Details' }}</h3>
-            <div class="flex space-x-2">
+            <div class="flex flex-wrap gap-2">
                 <a href="{{ route('admin.events.edit', $event->id) }}" style="background-color: var(--color-primary);" class="text-white px-4 py-2 rounded-md hover:opacity-90">
                     <i class="fas fa-edit mr-2"></i>Edit Event
+                </a>
+                <a href="{{ route('admin.events.feedbacks', $event->id) }}" style="background-color: #9333ea !important; color: white !important; display: inline-block !important;" class="px-4 py-2 rounded-md hover:bg-purple-700">
+                    <i class="fas fa-comments mr-2"></i>View Feedbacks
                 </a>
                 <a href="{{ route('admin.events.index') }}" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
                     <i class="fas fa-arrow-left mr-2"></i>Back to Events
