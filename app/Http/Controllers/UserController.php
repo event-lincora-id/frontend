@@ -19,7 +19,7 @@ class UserController extends Controller
     }
 
     /**
-     * Display a listing of users
+     * Display a listing of users (Event Participants who joined organizer's events)
      */
     public function index(Request $request)
     {
@@ -31,39 +31,145 @@ class UserController extends Controller
                 return redirect()->route('login');
             }
 
-            // Build query parameters
-            $params = [
-                'page' => $request->get('page', 1),
-            ];
+            // Get events created by this organizer
+            $eventsResponse = $this->api->withToken($token)->get('events/my-events', [
+                'per_page' => 1000,
+            ]);
+            
+            Log::info('My Events Response:', ['response' => $eventsResponse]);
+            
+            // Try different response structures
+            $events = $eventsResponse['data']['events'] ?? 
+                     $eventsResponse['data']['data'] ?? 
+                     $eventsResponse['data'] ?? 
+                     $eventsResponse['events'] ?? 
+                     [];
+            
+            Log::info('Total events found:', ['count' => count($events)]);
+            
+            // Collect all unique participants from all events
+            $participantsMap = [];
+            
+            foreach ($events as $event) {
+                $eventId = $event['id'] ?? null;
+                if (!$eventId) continue;
+                
+                try {
+                    // Get participants for this event
+                    $participantsResponse = $this->api->withToken($token)->get("events/{$eventId}/participants");
+                    
+                    Log::info("Participants for event {$eventId}:", ['response' => $participantsResponse]);
+                    
+                    // Try different response structures
+                    $eventParticipants = $participantsResponse['data']['participants'] ?? 
+                                       $participantsResponse['data']['data'] ?? 
+                                       $participantsResponse['data'] ?? 
+                                       $participantsResponse['participants'] ?? 
+                                       [];
+                    
+                    if (!is_array($eventParticipants)) {
+                        Log::warning("Event participants is not an array for event {$eventId}");
+                        continue;
+                    }
+                    
+                    Log::info("Processing {count} participants for event {$eventId}", ['count' => count($eventParticipants)]);
+                    
+                    foreach ($eventParticipants as $participant) {
+                        // Try different possible user ID fields
+                        $userId = $participant['user_id'] ?? 
+                                 $participant['user']['id'] ?? 
+                                 $participant['id'] ?? null;
+                        
+                        if (!$userId) {
+                            Log::warning('No user ID found in participant:', ['participant' => $participant]);
+                            continue;
+                        }
+                        
+                        // Initialize participant data if not exists
+                        if (!isset($participantsMap[$userId])) {
+                            $userName = $participant['user']['name'] ?? 
+                                      $participant['name'] ?? 
+                                      $participant['user_name'] ?? 
+                                      'Unknown';
+                            
+                            $userEmail = $participant['user']['email'] ?? 
+                                       $participant['email'] ?? 
+                                       $participant['user_email'] ?? 
+                                       '';
+                            
+                            $participantsMap[$userId] = (object) [
+                                'id' => $userId,
+                                'name' => $userName,
+                                'full_name' => $participant['user']['full_name'] ?? 
+                                             $participant['full_name'] ?? 
+                                             $userName,
+                                'email' => $userEmail,
+                                'avatar' => $participant['user']['avatar'] ?? 
+                                          $participant['avatar'] ?? null,
+                                'role' => $participant['user']['role'] ?? 
+                                        $participant['role'] ?? 
+                                        'participant',
+                                'created_at' => $participant['user']['created_at'] ?? 
+                                              $participant['created_at'] ?? 
+                                              $participant['registered_at'] ?? 
+                                              now(),
+                                'events' => [],
+                            ];
+                        }
+                        
+                        // Add event participation info
+                        $participantsMap[$userId]->events[] = (object) [
+                            'event' => (object) [
+                                'id' => $event['id'] ?? null,
+                                'title' => $event['title'] ?? 'Event',
+                                'location' => $event['location'] ?? 'N/A',
+                                'start_date' => $event['start_date'] ?? $event['date'] ?? null,
+                                'category' => (object) ($event['category'] ?? ['name' => 'Uncategorized']),
+                            ],
+                            'status' => $participant['status'] ?? 'registered',
+                            'is_paid' => $participant['is_paid'] ?? 
+                                       ($participant['payment_status'] === 'paid') ?? 
+                                       ($participant['payment_status'] === 'completed') ?? 
+                                       false,
+                            'payment_status' => $participant['payment_status'] ?? null,
+                            'attended_at' => $participant['attended_at'] ?? 
+                                           $participant['attendance_date'] ?? null,
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not fetch participants for event {$eventId}: " . $e->getMessage());
+                    continue;
+                }
+            }
+            
+            Log::info('Total unique participants found:', ['count' => count($participantsMap)]);
+            
+            // Convert to array and apply search filter if needed
+            $usersData = array_values($participantsMap);
             
             if ($request->has('search') && $request->search) {
-                $params['search'] = $request->search;
+                $search = strtolower($request->search);
+                $usersData = array_filter($usersData, function($user) use ($search) {
+                    return str_contains(strtolower($user->name), $search) ||
+                           str_contains(strtolower($user->email), $search) ||
+                           str_contains(strtolower($user->full_name), $search);
+                });
+                $usersData = array_values($usersData);
             }
             
-            if ($request->has('role') && $request->role) {
-                $params['role'] = $request->role;
-            }
-
-            // Get users from API
-            $response = $this->api->withToken($token)->get('admin/users', $params);
-            
-            $usersData = $response['data']['data'] ?? [];
-            $pagination = $response['data']['pagination'] ?? [
-                'total' => count($usersData),
-                'per_page' => 10,
-                'current_page' => 1,
-                'last_page' => 1
-            ];
-
-            // Convert to objects
-            $usersData = array_map(fn($u) => (object) $u, $usersData);
+            // Manual pagination
+            $page = $request->get('page', 1);
+            $perPage = 10;
+            $total = count($usersData);
+            $offset = ($page - 1) * $perPage;
+            $paginatedData = array_slice($usersData, $offset, $perPage);
 
             // Create Laravel paginator
             $users = new LengthAwarePaginator(
-                $usersData,
-                $pagination['total'] ?? count($usersData),
-                $pagination['per_page'] ?? 10,
-                $pagination['current_page'] ?? 1,
+                $paginatedData,
+                $total,
+                $perPage,
+                $page,
                 [
                     'path' => $request->url(),
                     'query' => $request->query(),
@@ -79,7 +185,7 @@ class UserController extends Controller
             
             return view('admin.users.index', [
                 'users' => $users,
-                'error' => 'Tidak dapat memuat data users: ' . $e->getMessage()
+                'error' => 'Tidak dapat memuat data participants: ' . $e->getMessage()
             ]);
         }
     }

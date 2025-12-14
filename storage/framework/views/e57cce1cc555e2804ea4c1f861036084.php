@@ -1,10 +1,8 @@
-@extends('admin.layout')
+<?php $__env->startSection('title', 'Event Participants'); ?>
+<?php $__env->startSection('page-title', 'Event Participants'); ?>
+<?php $__env->startSection('page-description', 'Manage participants who joined your events'); ?>
 
-@section('title', 'Event Participants')
-@section('page-title', 'Event Participants')
-@section('page-description', 'Manage participants who joined your events')
-
-@section('content')
+<?php $__env->startSection('content'); ?>
 <div class="bg-white rounded-lg shadow">
     <!-- Header -->
     <div class="px-6 py-4 border-b border-gray-200">
@@ -17,26 +15,28 @@
         </div>
     </div>
 
-    @if(session('error'))
+    <?php if(session('error')): ?>
     <div class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
-    </div>
-    @endif
+        <i class="fas fa-exclamation-circle mr-2"></i><?php echo e(session('error')); ?>
 
-    @if(isset($error))
-    <div class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        <i class="fas fa-exclamation-circle mr-2"></i>{{ $error }}
     </div>
-    @endif
+    <?php endif; ?>
+
+    <?php if(isset($error)): ?>
+    <div class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <i class="fas fa-exclamation-circle mr-2"></i><?php echo e($error); ?>
+
+    </div>
+    <?php endif; ?>
 
     <!-- Search and Filter -->
     <div class="px-6 py-4 border-b border-gray-200">
-        <form method="GET" action="{{ route('admin.users.index') }}" class="flex flex-col sm:flex-row gap-4">
+        <form method="GET" action="<?php echo e(route('admin.users.index')); ?>" class="flex flex-col sm:flex-row gap-4">
             <div class="flex-1">
                 <input type="text" 
                        name="search" 
                        id="searchInput"
-                       value="{{ request('search') }}" 
+                       value="<?php echo e(request('search')); ?>" 
                        placeholder="Search by name or email..." 
                        class="admin-input w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500">
             </div>
@@ -46,31 +46,32 @@
                         class="px-4 py-2 text-white rounded-md hover:opacity-90 transition-opacity">
                     <i class="fas fa-search mr-2"></i>Search
                 </button>
-                @if(request('search'))
-                <a href="{{ route('admin.users.index') }}" 
+                <?php if(request('search')): ?>
+                <a href="<?php echo e(route('admin.users.index')); ?>" 
                    class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors">
                     <i class="fas fa-times mr-2"></i>Clear
                 </a>
-                @endif
+                <?php endif; ?>
             </div>
         </form>
-        @if(request('search'))
+        <?php if(request('search')): ?>
         <div class="mt-3 text-sm text-gray-600">
             <i class="fas fa-info-circle mr-1"></i>
-            Showing results for: <strong>"{{ request('search') }}"</strong>
+            Showing results for: <strong>"<?php echo e(request('search')); ?>"</strong>
         </div>
-        @endif
+        <?php endif; ?>
     </div>
 
     <!-- Users Table -->
     <div class="overflow-x-auto">
-        @if($users->total() > 0)
+        <?php if($users->total() > 0): ?>
         <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
             <span class="text-sm text-gray-600">
-                Showing <strong>{{ $users->firstItem() }}</strong> to <strong>{{ $users->lastItem() }}</strong> of <strong>{{ $users->total() }}</strong> participant{{ $users->total() !== 1 ? 's' : '' }}
+                Showing <strong><?php echo e($users->firstItem()); ?></strong> to <strong><?php echo e($users->lastItem()); ?></strong> of <strong><?php echo e($users->total()); ?></strong> participant<?php echo e($users->total() !== 1 ? 's' : ''); ?>
+
             </span>
         </div>
-        @endif
+        <?php endif; ?>
         
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -84,54 +85,55 @@
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                @forelse($users as $user)
+                <?php $__empty_1 = true; $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-10 w-10">
-                                @if($user->avatar ?? null)
-                                    <img class="h-10 w-10 rounded-full" src="{{ $user->avatar }}" alt="{{ $user->full_name ?? $user->name }}">
-                                @else
+                                <?php if($user->avatar ?? null): ?>
+                                    <img class="h-10 w-10 rounded-full" src="<?php echo e($user->avatar); ?>" alt="<?php echo e($user->full_name ?? $user->name); ?>">
+                                <?php else: ?>
                                     <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
                                         <i class="fas fa-user text-gray-600"></i>
                                     </div>
-                                @endif
+                                <?php endif; ?>
                             </div>
                             <div class="ml-4">
-                                <div class="text-sm font-medium text-gray-900">{{ $user->full_name ?? $user->name }}</div>
-                                <div class="text-sm text-gray-500">{{ $user->email }}</div>
+                                <div class="text-sm font-medium text-gray-900"><?php echo e($user->full_name ?? $user->name); ?></div>
+                                <div class="text-sm text-gray-500"><?php echo e($user->email); ?></div>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ ($user->role ?? 'participant') === 'admin' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800' }}">
-                            {{ ucfirst($user->role ?? 'Participant') }}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo e(($user->role ?? 'participant') === 'admin' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'); ?>">
+                            <?php echo e(ucfirst($user->role ?? 'Participant')); ?>
+
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        @php
+                        <?php
                             $participationCount = 0;
                             if (isset($user->event_participations) && is_array($user->event_participations)) {
                                 $participationCount = count($user->event_participations);
                             } elseif (isset($user->events) && is_array($user->events)) {
                                 $participationCount = count($user->events);
                             }
-                        @endphp
-                        {{ $participationCount }} event{{ $participationCount !== 1 ? 's' : '' }} joined
+                        ?>
+                        <?php echo e($participationCount); ?> event<?php echo e($participationCount !== 1 ? 's' : ''); ?> joined
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        @if(isset($user->created_at))
-                            @php
+                        <?php if(isset($user->created_at)): ?>
+                            <?php
                                 try {
                                     $date = new \DateTime($user->created_at);
                                     echo $date->format('M d, Y');
                                 } catch (\Exception $e) {
                                     echo $user->created_at;
                                 }
-                            @endphp
-                        @else
+                            ?>
+                        <?php else: ?>
                             -
-                        @endif
+                        <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -140,12 +142,12 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div class="flex space-x-2">
-                            @if($participationCount > 0)
-                                <button onclick="toggleUserEvents({{ $user->id }})" class="text-purple-600 hover:text-purple-900" title="View Events">
+                            <?php if($participationCount > 0): ?>
+                                <button onclick="toggleUserEvents(<?php echo e($user->id); ?>)" class="text-purple-600 hover:text-purple-900" title="View Events">
                                     <i class="fas fa-list"></i>
                                 </button>
-                            @endif
-                            <a href="{{ route('admin.users.show', $user->id) }}" style="color: var(--color-primary);" class="hover:opacity-80" title="View Details">
+                            <?php endif; ?>
+                            <a href="<?php echo e(route('admin.users.show', $user->id)); ?>" style="color: var(--color-primary);" class="hover:opacity-80" title="View Details">
                                 <i class="fas fa-eye"></i>
                             </a>
                         </div>
@@ -153,126 +155,129 @@
                 </tr>
                 
                 <!-- Expandable row for user events -->
-                @if($participationCount > 0)
-                <tr id="user-events-{{ $user->id }}" class="hidden bg-gray-50">
+                <?php if($participationCount > 0): ?>
+                <tr id="user-events-<?php echo e($user->id); ?>" class="hidden bg-gray-50">
                     <td colspan="6" class="px-6 py-4">
                         <div class="bg-white rounded-lg shadow-sm p-4">
                             <h4 class="text-lg font-semibold text-gray-800 mb-4">
                                 <i class="fas fa-calendar-alt mr-2"></i>
-                                Events Joined by {{ $user->full_name ?? $user->name }}
+                                Events Joined by <?php echo e($user->full_name ?? $user->name); ?>
+
                             </h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                @php
+                                <?php
                                     $events = $user->events ?? $user->event_participations ?? [];
-                                @endphp
-                                @foreach($events as $participation)
-                                    @php
+                                ?>
+                                <?php $__currentLoopData = $events; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $participation): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <?php
                                         // Handle both direct event object and participation object
                                         $event = $participation->event ?? $participation;
                                         $status = $participation->status ?? 'registered';
                                         $isPaid = $participation->is_paid ?? $participation->payment_status ?? false;
                                         $attendedAt = $participation->attended_at ?? null;
-                                    @endphp
+                                    ?>
                                     <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <h5 class="font-semibold text-gray-900 mb-2">{{ $event->title ?? 'Event' }}</h5>
+                                        <h5 class="font-semibold text-gray-900 mb-2"><?php echo e($event->title ?? 'Event'); ?></h5>
                                         <div class="space-y-2 text-sm">
                                             <div class="flex items-center text-gray-600">
                                                 <i class="fas fa-map-marker-alt w-4 mr-2"></i>
-                                                <span>{{ $event->location ?? 'N/A' }}</span>
+                                                <span><?php echo e($event->location ?? 'N/A'); ?></span>
                                             </div>
                                             <div class="flex items-center text-gray-600">
                                                 <i class="fas fa-calendar w-4 mr-2"></i>
                                                 <span>
-                                                    @if(isset($event->start_date))
-                                                        @php
+                                                    <?php if(isset($event->start_date)): ?>
+                                                        <?php
                                                             try {
                                                                 $startDate = new \DateTime($event->start_date);
                                                                 echo $startDate->format('M d, Y');
                                                             } catch (\Exception $e) {
                                                                 echo $event->start_date;
                                                             }
-                                                        @endphp
-                                                    @else
+                                                        ?>
+                                                    <?php else: ?>
                                                         N/A
-                                                    @endif
+                                                    <?php endif; ?>
                                                 </span>
                                             </div>
                                             <div class="flex items-center text-gray-600">
                                                 <i class="fas fa-tag w-4 mr-2"></i>
-                                                <span>{{ $event->category->name ?? 'Uncategorized' }}</span>
+                                                <span><?php echo e($event->category->name ?? 'Uncategorized'); ?></span>
                                             </div>
                                             <div class="flex items-center justify-between pt-2 border-t">
                                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium 
-                                                    {{ $status === 'attended' ? 'bg-green-100 text-green-800' : 
-                                                       ($status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800') }}">
-                                                    {{ ucfirst($status) }}
+                                                    <?php echo e($status === 'attended' ? 'bg-green-100 text-green-800' : 
+                                                       ($status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800')); ?>">
+                                                    <?php echo e(ucfirst($status)); ?>
+
                                                 </span>
-                                                @if($isPaid || ($isPaid === 'paid'))
+                                                <?php if($isPaid || ($isPaid === 'paid')): ?>
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                         <i class="fas fa-check-circle mr-1"></i>Paid
                                                     </span>
-                                                @endif
+                                                <?php endif; ?>
                                             </div>
-                                            @if($attendedAt)
+                                            <?php if($attendedAt): ?>
                                                 <div class="flex items-center text-gray-500 text-xs pt-1">
                                                     <i class="fas fa-check-circle mr-1"></i>
                                                     Attended: 
-                                                    @php
+                                                    <?php
                                                         try {
                                                             $attended = new \DateTime($attendedAt);
                                                             echo $attended->format('M d, Y H:i');
                                                         } catch (\Exception $e) {
                                                             echo $attendedAt;
                                                         }
-                                                    @endphp
+                                                    ?>
                                                 </div>
-                                            @endif
+                                            <?php endif; ?>
                                         </div>
                                     </div>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </div>
                         </div>
                     </td>
                 </tr>
-                @endif
-                @empty
+                <?php endif; ?>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <tr>
                     <td colspan="6" class="px-6 py-12 text-center">
                         <div class="flex flex-col items-center justify-center">
                             <i class="fas fa-users-slash text-gray-400 text-5xl mb-4"></i>
-                            @if(request('search'))
+                            <?php if(request('search')): ?>
                                 <h3 class="text-lg font-medium text-gray-900 mb-2">No participants found</h3>
                                 <p class="text-gray-500 mb-4">
-                                    No participants match your search "<strong>{{ request('search') }}</strong>"
+                                    No participants match your search "<strong><?php echo e(request('search')); ?></strong>"
                                 </p>
-                                <a href="{{ route('admin.users.index') }}" 
+                                <a href="<?php echo e(route('admin.users.index')); ?>" 
                                    class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors">
                                     <i class="fas fa-times mr-2"></i>Clear Search
                                 </a>
-                            @else
+                            <?php else: ?>
                                 <h3 class="text-lg font-medium text-gray-900 mb-2">No participants yet</h3>
                                 <p class="text-gray-500">
                                     No one has joined your events yet.
                                 </p>
-                            @endif
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>
-                @endforelse
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
 
     <!-- Pagination -->
-    @if($users->hasPages())
+    <?php if($users->hasPages()): ?>
     <div class="px-6 py-4 border-t border-gray-200">
-        {{ $users->links() }}
-    </div>
-    @endif
-</div>
-@endsection
+        <?php echo e($users->links()); ?>
 
-@section('scripts')
+    </div>
+    <?php endif; ?>
+</div>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('scripts'); ?>
 <script>
 function toggleUserEvents(userId) {
     const eventRow = document.getElementById(`user-events-${userId}`);
@@ -304,4 +309,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('admin.layout', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\frontend\resources\views/admin/users/index.blade.php ENDPATH**/ ?>
