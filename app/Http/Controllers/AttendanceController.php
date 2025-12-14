@@ -98,7 +98,7 @@ class AttendanceController extends Controller
 
             $participantsResponse = $this->api->withToken($token)->get("events/{$eventId}/participants");
             $participantsData = $participantsResponse['data']['data'] ?? $participantsResponse['data'] ?? [];
-            $participants = array_map(fn($p) => (object) $p, $participantsData);
+            $participants = array_map(fn($p) => $this->arrayToObject($p), $participantsData);
 
             return view('admin.events.participants', compact('event', 'participants'));
         } catch (\Exception $e) {
@@ -112,11 +112,31 @@ class AttendanceController extends Controller
         if (!is_array($array)) {
             return $array;
         }
+
         $object = new \stdClass();
         foreach ($array as $key => $value) {
-            $object->$key = is_array($value) ? $this->arrayToObject($value) : $value;
+            if (is_array($value)) {
+                $object->$key = $this->arrayToObject($value);
+            } else {
+                // Convert datetime strings to Carbon objects
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/', $value)) {
+                    try {
+                        $parsed = \Carbon\Carbon::parse($value);
+                        // If it's UTC (has 'Z' or '+00:00'), convert to Asia/Jakarta
+                        if (str_contains($value, 'Z') || str_contains($value, '+00:00')) {
+                            $object->$key = $parsed->setTimezone('Asia/Jakarta');
+                        } else {
+                            // Already in correct timezone, return as Carbon object
+                            $object->$key = $parsed;
+                        }
+                    } catch (\Exception $e) {
+                        $object->$key = $value;
+                    }
+                } else {
+                    $object->$key = $value;
+                }
+            }
         }
         return $object;
     }
 }
-

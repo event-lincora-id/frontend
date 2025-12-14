@@ -163,7 +163,7 @@
                 @if($event->image)
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Current Image</label>
-                    <img src="{{ asset('storage/' . $event->image) }}" alt="{{ $event->title }}" class="w-full h-48 object-cover rounded-lg border">
+                    <img src="{{ $event->image_url ?? asset('storage/' . $event->image) }}" alt="{{ $event->title }}" class="w-full h-48 object-cover rounded-lg border">
                 </div>
                 @endif
 

@@ -302,7 +302,7 @@ unset($__errorArgs, $__bag); ?>
                 <?php if($event->image): ?>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Current Image</label>
-                    <img src="<?php echo e(asset('storage/' . $event->image)); ?>" alt="<?php echo e($event->title); ?>" class="w-full h-48 object-cover rounded-lg border">
+                    <img src="<?php echo e($event->image_url ?? asset('storage/' . $event->image)); ?>" alt="<?php echo e($event->title); ?>" class="w-full h-48 object-cover rounded-lg border">
                 </div>
                 <?php endif; ?>
 

@@ -125,7 +125,7 @@ class EventController extends Controller
             // Get categories for filter
             $categoriesResponse = $this->api->get('categories');
             $categoriesData = $categoriesResponse['data'] ?? [];
-            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+            $categories = array_map(fn($cat) => $this->arrayToObject($cat), $categoriesData);
 
             return view('admin.events.index', compact('events', 'categories'));
 
@@ -150,7 +150,7 @@ class EventController extends Controller
         try {
             $categoriesResponse = $this->api->get('categories');
             $categoriesData = $categoriesResponse['data'] ?? [];
-            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+            $categories = array_map(fn($cat) => $this->arrayToObject($cat), $categoriesData);
 
             return view('admin.events.create', compact('categories'));
 
@@ -283,7 +283,7 @@ class EventController extends Controller
 
             $categoriesResponse = $this->api->get('categories');
             $categoriesData = $categoriesResponse['data'] ?? [];
-            $categories = array_map(fn($cat) => (object) $cat, $categoriesData);
+            $categories = array_map(fn($cat) => $this->arrayToObject($cat), $categoriesData);
 
             return view('admin.events.edit', compact('event', 'categories'));
 
@@ -480,7 +480,7 @@ class EventController extends Controller
                 $participantsData = [];
             }
             
-            $participants = array_map(fn($p) => (object) $p, $participantsData);
+            $participants = array_map(fn($p) => $this->arrayToObject($p), $participantsData);
 
             return view('admin.events.participants', compact('event', 'participants'));
 
@@ -505,7 +505,23 @@ class EventController extends Controller
             if (is_array($value)) {
                 $object->$key = $this->arrayToObject($value);
             } else {
-                $object->$key = $value;
+                // Convert datetime strings to Carbon objects
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/', $value)) {
+                    try {
+                        $parsed = \Carbon\Carbon::parse($value);
+                        // If it's UTC (has 'Z' or '+00:00'), convert to Asia/Jakarta
+                        if (str_contains($value, 'Z') || str_contains($value, '+00:00')) {
+                            $object->$key = $parsed->setTimezone('Asia/Jakarta');
+                        } else {
+                            // Already in correct timezone, return as Carbon object
+                            $object->$key = $parsed;
+                        }
+                    } catch (\Exception $e) {
+                        $object->$key = $value;
+                    }
+                } else {
+                    $object->$key = $value;
+                }
             }
         }
         return $object;

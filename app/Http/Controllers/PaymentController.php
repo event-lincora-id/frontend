@@ -196,7 +196,23 @@ class PaymentController extends Controller
             if (is_array($value)) {
                 $object->$key = $this->arrayToObject($value);
             } else {
-                $object->$key = $value;
+                // Convert datetime strings to Carbon objects
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/', $value)) {
+                    try {
+                        $parsed = \Carbon\Carbon::parse($value);
+                        // If it's UTC (has 'Z' or '+00:00'), convert to Asia/Jakarta
+                        if (str_contains($value, 'Z') || str_contains($value, '+00:00')) {
+                            $object->$key = $parsed->setTimezone('Asia/Jakarta');
+                        } else {
+                            // Already in correct timezone, return as Carbon object
+                            $object->$key = $parsed;
+                        }
+                    } catch (\Exception $e) {
+                        $object->$key = $value;
+                    }
+                } else {
+                    $object->$key = $value;
+                }
             }
         }
         return $object;

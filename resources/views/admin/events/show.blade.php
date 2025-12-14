@@ -102,7 +102,7 @@
             <div>
                 <h4 class="text-lg font-medium text-gray-900 mb-4">Event Image</h4>
                 @if($event->image)
-                    <img class="w-full h-64 object-cover rounded-lg" src="{{ asset('storage/' . $event->image) }}" alt="{{ $event->title }}">
+                    <img class="w-full h-64 object-cover rounded-lg" src="{{ $event->image_url ?? asset('storage/' . $event->image) }}" alt="{{ $event->title }}">
                 @else
                     <div class="w-full h-64 bg-gray-300 rounded-lg flex items-center justify-center">
                         <i class="fas fa-calendar text-gray-600 text-4xl"></i>
