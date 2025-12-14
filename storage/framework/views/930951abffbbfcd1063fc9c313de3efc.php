@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code - {{ $event->title }} - Event Connect</title>
+    <title>QR Code - <?php echo e($event->title); ?> - Event Connect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- QR Code Generator Library -->
@@ -46,10 +46,10 @@
             <header class="bg-white shadow-sm border-b">
                 <div class="px-6 py-4 flex justify-between items-center">
                     <div>
-                        <h2 class="text-3xl font-bold text-gray-800">QR Code - {{ $event->title }}</h2>
+                        <h2 class="text-3xl font-bold text-gray-800">QR Code - <?php echo e($event->title); ?></h2>
                         <p class="text-gray-600">Use this QR code for event attendance</p>
                     </div>
-                    <a href="{{ route('admin.events.index') }}" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center">
+                    <a href="<?php echo e(route('admin.events.index')); ?>" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center">
                         <i class="fas fa-arrow-left mr-2"></i>Back to Events
                     </a>
                 </div>
@@ -59,12 +59,12 @@
             <div class="p-6">
                 <div class="bg-white rounded-lg shadow-lg p-8">
                     <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-800 mb-2">{{ $event->title }}</h3>
-                        <p class="text-gray-600">{{ $event->location }}</p>
-                        <p class="text-gray-500 text-sm">{{ \Carbon\Carbon::parse($event->start_date)->format('l, F d, Y') }}</p>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-2"><?php echo e($event->title); ?></h3>
+                        <p class="text-gray-600"><?php echo e($event->location); ?></p>
+                        <p class="text-gray-500 text-sm"><?php echo e(\Carbon\Carbon::parse($event->start_date)->format('l, F d, Y')); ?></p>
                     </div>
 
-                    @if($event->qr_code_string)
+                    <?php if($event->qr_code_string): ?>
                         <div class="flex flex-col md:flex-row gap-8 items-center justify-center">
                             <!-- QR Code Display -->
                             <div class="bg-white p-6 rounded-lg shadow-lg border-4" style="border-color: #B22234;">
@@ -90,20 +90,20 @@
                                     <h4 class="font-semibold text-green-900 mb-2">
                                         <i class="fas fa-users mr-2"></i>Attendance Status
                                     </h4>
-                                        @php
+                                        <?php
                                             $participantsCollection = collect($participants ?? []);
                                             $registeredCount = isset($event->registered_count) ? $event->registered_count : ($participantsCollection->count());
                                             $attendedCount = $participantsCollection->where('status', 'attended')->count();
-                                        @endphp
+                                        ?>
                                         <div class="text-green-800 text-sm">
-                                            <p><strong>Registered:</strong> {{ $registeredCount }} participants</p>
-                                            <p><strong>Attended:</strong> {{ $attendedCount }} participants</p>
+                                            <p><strong>Registered:</strong> <?php echo e($registeredCount); ?> participants</p>
+                                            <p><strong>Attended:</strong> <?php echo e($attendedCount); ?> participants</p>
                                         </div>
                                 </div>
 
                                 <div class="flex gap-3">
-                                    <a href="{{ route('attendance.participants', $event->id) }}" 
-                                        <a href="{{ route('attendance.participants', $event->id) }}" 
+                                    <a href="<?php echo e(route('attendance.participants', $event->id)); ?>" 
+                                        <a href="<?php echo e(route('attendance.participants', $event->id)); ?>" 
                                        style="background-color: #B22234;" class="flex-1 hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg text-center transition duration-200">
                                         <i class="fas fa-list mr-2"></i>View Participants
                                     </a>
@@ -123,7 +123,7 @@
                             <div class="flex items-center gap-2">
                                 <input type="text"
                                        id="qr-code-string"
-                                       value="{{ $event->qr_code_string }}"
+                                       value="<?php echo e($event->qr_code_string); ?>"
                                        readonly
                                        class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white font-mono text-sm">
                                 <button onclick="copyQRCode()"
@@ -132,17 +132,17 @@
                                 </button>
                             </div>
                         </div>
-                    @else
+                    <?php else: ?>
                         <div class="text-center py-12">
                             <i class="fas fa-qrcode text-6xl text-gray-400 mb-4"></i>
                             <h3 class="text-xl font-semibold text-gray-700 mb-2">QR Code Not Generated</h3>
                             <p class="text-gray-600 mb-4">QR code will be generated automatically when you publish the event.</p>
-                            <a href="{{ route('admin.events.edit', $event->id) }}" 
+                            <a href="<?php echo e(route('admin.events.edit', $event->id)); ?>" 
                                style="background-color: #B22234;" class="inline-block hover:opacity-90 text-white font-bold py-2 px-6 rounded-lg transition duration-200">
                                 Edit Event
                             </a>
                         </div>
-                    @endif
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -151,8 +151,8 @@
     <script>
         // Generate QR code on page load
         document.addEventListener('DOMContentLoaded', function() {
-            @if(isset($event->qr_code_string))
-            const qrCodeString = '{{ $event->qr_code_string }}';
+            <?php if(isset($event->qr_code_string)): ?>
+            const qrCodeString = '<?php echo e($event->qr_code_string); ?>';
             const container = document.getElementById('qrcode-container');
 
             if (container && qrCodeString) {
@@ -166,7 +166,7 @@
                     correctLevel: QRCode.CorrectLevel.H
                 });
             }
-            @endif
+            <?php endif; ?>
         });
 
         function downloadQR() {
@@ -178,7 +178,7 @@
                 qrCanvas.toBlob(function(blob) {
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
-                    link.download = 'qr-code-{{ $event->id }}.png';
+                    link.download = 'qr-code-<?php echo e($event->id); ?>.png';
                     link.click();
                     URL.revokeObjectURL(link.href);
                 });
@@ -204,3 +204,4 @@
 </body>
 </html>
 
+<?php /**PATH C:\Study\Kuliah\Semester-7\CP\event-connect\resources\views/admin/events/qr-code.blade.php ENDPATH**/ ?>

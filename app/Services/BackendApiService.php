@@ -74,6 +74,22 @@ class BackendApiService
     }
 
     /**
+     * Perform a POST request with file upload (multipart/form-data).
+     */
+    public function postMultipart(string $endpoint, array $payload = [], ?string $token = null): array
+    {
+        return $this->requestMultipart('post', $endpoint, $payload, $token);
+    }
+
+    /**
+     * Perform a PUT request with file upload (multipart/form-data).
+     */
+    public function putMultipart(string $endpoint, array $payload = [], ?string $token = null): array
+    {
+        return $this->requestMultipart('put', $endpoint, $payload, $token);
+    }
+
+    /**
      * Perform a GET request and return raw response (for file downloads).
      */
     public function getRaw(string $endpoint, array $query = [], ?string $token = null): array
@@ -186,6 +202,96 @@ class BackendApiService
                 'response_json' => $response->json(),
             ]);
             
+            throw new BackendApiException(
+                "Backend API returned error ({$status}): {$message}",
+                $response
+            );
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Base request handler for multipart/form-data (file uploads).
+     *
+     * @throws BackendApiException
+     */
+    protected function requestMultipart(string $method, string $endpoint, array $data = [], ?string $token = null): array
+    {
+        $endpoint = '/' . ltrim($endpoint, '/');
+        $baseUrl = rtrim(config('services.backend.base_url'), '/');
+        $fullUrl = $baseUrl . $endpoint;
+
+        // Create a new HTTP client for multipart requests (without asJson())
+        $client = Http::baseUrl($baseUrl)
+            ->acceptJson()
+            ->withoutVerifying()
+            ->timeout((int) config('services.backend.timeout', 10))
+            ->connectTimeout(5);
+
+        if ($token) {
+            $client = $client->withToken($token);
+        }
+
+        // Separate files from regular data
+        $files = [];
+        $regularData = [];
+
+        foreach ($data as $key => $value) {
+            if ($value instanceof \Illuminate\Http\UploadedFile) {
+                $files[$key] = $value;
+            } else {
+                $regularData[$key] = $value;
+            }
+        }
+
+        // Attach files to the client
+        foreach ($files as $name => $file) {
+            $client = $client->attach(
+                $name,
+                file_get_contents($file->getRealPath()),
+                $file->getClientOriginalName()
+            );
+        }
+
+        // For PUT requests with multipart data, use POST with _method=PUT
+        // This is necessary because PUT doesn't handle multipart/form-data properly
+        if (strtolower($method) === 'put') {
+            $regularData['_method'] = 'PUT';
+            $method = 'post';
+        }
+
+        try {
+            /** @var Response $response */
+            $response = match (strtolower($method)) {
+                'post' => $client->post($endpoint, $regularData),
+                default => throw new BackendApiException("Unsupported multipart method [{$method}]")
+            };
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $message = "Tidak dapat terhubung ke backend API di {$fullUrl}. ";
+            $message .= "Pastikan backend server sedang berjalan dan API_BASE_URL di .env sudah benar.";
+
+            throw new BackendApiException($message, null, $e);
+        } catch (\Exception $e) {
+            throw new BackendApiException(
+                "Backend API request failed: " . $e->getMessage(),
+                null,
+                $e
+            );
+        }
+
+        if ($response->failed()) {
+            $message = $response->json('message') ?? 'Backend API request failed';
+            $status = $response->status();
+
+            \Log::error('Backend API Error (Multipart)', [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'status' => $status,
+                'message' => $message,
+                'response_body' => $response->body(),
+            ]);
+
             throw new BackendApiException(
                 "Backend API returned error ({$status}): {$message}",
                 $response

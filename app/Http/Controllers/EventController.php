@@ -176,6 +176,7 @@ class EventController extends Controller
             'quota' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'status' => 'required|in:draft,published,cancelled,completed',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -186,13 +187,13 @@ class EventController extends Controller
 
         try {
             $token = Session::get('api_token');
-            
+
             if (!$token) {
                 return redirect()->route('login')
                     ->with('error', 'Silakan login terlebih dahulu');
             }
 
-            // Only send fields that exist in database
+            // Prepare data for multipart request
             $data = [
                 'title' => $request->title,
                 'description' => $request->description,
@@ -205,9 +206,16 @@ class EventController extends Controller
                 'status' => $request->status,
             ];
 
-            Log::info('Creating event with data:', $data);
+            Log::info('Creating event with data:', array_keys($data));
 
-            $response = $this->api->withToken($token)->post('events', $data);
+            // Use multipart if image is uploaded, otherwise use regular post
+            if ($request->hasFile('image')) {
+                // Attach the file for multipart upload
+                $data['image'] = $request->file('image');
+                $response = $this->api->postMultipart('events', $data, $token);
+            } else {
+                $response = $this->api->withToken($token)->post('events', $data);
+            }
 
             Log::info('Event created response:', $response);
 
@@ -301,6 +309,7 @@ class EventController extends Controller
             'quota' => 'required|integer|min:1',
             'price' => 'required|numeric|min:0',
             'status' => 'required|in:draft,published,cancelled,completed',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -311,7 +320,7 @@ class EventController extends Controller
 
         try {
             $token = Session::get('api_token');
-            
+
             if (!$token) {
                 return redirect()->route('login')
                     ->with('error', 'Silakan login terlebih dahulu');
@@ -329,7 +338,16 @@ class EventController extends Controller
                 'status' => $request->status,
             ];
 
-            $response = $this->api->withToken($token)->put("events/{$id}", $data);
+            Log::info('Updating event with data:', array_keys($data));
+
+            // Use multipart if image is uploaded, otherwise use regular put
+            if ($request->hasFile('image')) {
+                // Attach the file for multipart upload
+                $data['image'] = $request->file('image');
+                $response = $this->api->putMultipart("events/{$id}", $data, $token);
+            } else {
+                $response = $this->api->withToken($token)->put("events/{$id}", $data);
+            }
 
             if (isset($response['success']) && $response['success']) {
                 return redirect()->route('admin.events.index')

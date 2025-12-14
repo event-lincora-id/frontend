@@ -48,11 +48,7 @@ Route::middleware('guest')->group(function () {
     return view('auth.forgot-password');
 })->name('password.request');
 
-Route::post('/forgot-password', function () {
-    return back()->withErrors([
-        'email' => 'Fitur reset password belum tersedia. Silakan hubungi administrator untuk reset password Anda.'
-    ])->withInput();
-})->name('password.email');
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('password.email');
     Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 });

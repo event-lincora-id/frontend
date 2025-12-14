@@ -316,7 +316,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($paymentHistory->take(3) as $payment)
+                                    @foreach($paymentHistory->take(10) as $payment)
                                         @php
                                             $event = $payment->event ?? null;
                                             $paymentInfo = $payment->payment ?? null;

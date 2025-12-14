@@ -65,11 +65,13 @@
                             </div>
                             <script>
                             // Load unread notification count
+                            let notificationInterval = null; // Store interval ID globally
+
                             async function loadNotificationCount() {
                                 try {
                                     const response = await fetch('/participant/notifications/unread-count');
                                     const data = await response.json();
-                                    
+
                                     if (data.success && data.count > 0) {
                                         const badge = document.getElementById('notification-badge');
                                         if (badge) {
@@ -82,11 +84,26 @@
                                 }
                             }
 
-                            // Load on page load
-                            document.addEventListener('DOMContentLoaded', loadNotificationCount);
+                            // Initialize notification polling once
+                            document.addEventListener('DOMContentLoaded', function() {
+                                // Load immediately on page load
+                                loadNotificationCount();
 
-                            // Refresh every 30 seconds
-                            setInterval(loadNotificationCount, 30000);
+                                // Clear any existing interval (in case of HMR or duplicate loads)
+                                if (notificationInterval) {
+                                    clearInterval(notificationInterval);
+                                }
+
+                                // Set up new interval - refresh every 30 seconds
+                                notificationInterval = setInterval(loadNotificationCount, 30000);
+                            });
+
+                            // Clean up interval when page unloads (optional but good practice)
+                            window.addEventListener('beforeunload', function() {
+                                if (notificationInterval) {
+                                    clearInterval(notificationInterval);
+                                }
+                            });
                             </script>
                             <!-- Guide shortcut -->
                             <a href="<?php echo e(route('guide')); ?>" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Panduan">
@@ -111,7 +128,7 @@
                             </div>
                         </div>
                     <?php else: ?>
-                        <div class="flex items-center space-x-2">
+                        <div class="hidden md:flex items-center space-x-2">
                             <a href="<?php echo e(route('guide')); ?>" class="w-8 h-8 bg-white rounded-md text-gray-900 hover:bg-gray-100 flex items-center justify-center" title="Panduan">
                                 <i class="fas fa-book-open text-sm"></i>
                             </a>
