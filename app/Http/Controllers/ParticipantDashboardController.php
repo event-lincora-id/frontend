@@ -34,6 +34,7 @@ class ParticipantDashboardController extends Controller
             // Get user's registered events from API
             try {
                 // Request all participations (high per_page to avoid pagination)
+                Log::info('Requesting participations with params:', ['per_page' => 100]);
                 $participationsResponse = $this->api->withToken($token)->get('participants/my-participations', [
                     'per_page' => 100
                 ]);
@@ -46,6 +47,42 @@ class ParticipantDashboardController extends Controller
                     'first_item_raw' => isset($participationsResponse['data'][0]) ? json_encode($participationsResponse['data'][0]) : 'no first item',
                     'data_keys' => isset($participationsResponse['data']) ? array_keys($participationsResponse['data']) : []
                 ]);
+
+                // Get user's feedbacks
+                $userFeedbacks = [];
+                try {
+                    Log::info('Attempting to fetch feedbacks...');
+                    $feedbacksResponse = $this->api->withToken($token)->get('feedbacks/my-feedbacks');
+
+                    Log::info('Feedbacks API raw response:', [
+                        'response' => json_encode($feedbacksResponse)
+                    ]);
+
+                    if (isset($feedbacksResponse['success']) && $feedbacksResponse['success']) {
+                        // Handle paginated response - feedbacks are in data.data
+                        $feedbacksData = $feedbacksResponse['data']['data'] ?? $feedbacksResponse['data'];
+                        Log::info('Feedbacks data:', ['data' => json_encode($feedbacksData)]);
+
+                        // Create a map of event_id => feedback
+                        if (is_array($feedbacksData)) {
+                            foreach ($feedbacksData as $feedback) {
+                                $feedback = (object) $feedback;
+                                $userFeedbacks[$feedback->event_id] = $feedback;
+                            }
+                        }
+                    }
+
+                    Log::info('User feedbacks loaded:', [
+                        'count' => count($userFeedbacks),
+                        'event_ids' => array_keys($userFeedbacks),
+                        'full_map' => json_encode($userFeedbacks)
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Feedbacks endpoint error: ' . $e->getMessage(), [
+                        'exception' => get_class($e),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                }
 
                 // Parse response - handle paginated response
                 $participationsData = [];
@@ -157,8 +194,13 @@ class ParticipantDashboardController extends Controller
                 ]);
             }
 
-            // Get upcoming events
-            $upcomingEvents = $registeredEvents
+            // Filter only registered or attended events (exclude pending_payment and cancelled)
+            $activeEvents = $registeredEvents->filter(function ($participant) {
+                return in_array($participant->status ?? '', ['registered', 'attended']);
+            });
+
+            // Get upcoming events (exclude pending_payment)
+            $upcomingEvents = $activeEvents
                 ->filter(function ($participant) {
                     return isset($participant->event->start_date)
                         && \Carbon\Carbon::parse($participant->event->start_date)->isAfter(now());
@@ -168,8 +210,8 @@ class ParticipantDashboardController extends Controller
                 })
                 ->values();
 
-            // Get past events
-            $pastEvents = $registeredEvents
+            // Get past events (exclude pending_payment)
+            $pastEvents = $activeEvents
                 ->filter(function ($participant) {
                     return isset($participant->event->start_date)
                         && \Carbon\Carbon::parse($participant->event->start_date)->isBefore(now());
@@ -179,10 +221,10 @@ class ParticipantDashboardController extends Controller
                 })
                 ->values();
 
-            // Get user statistics
+            // Get user statistics (only count registered/attended)
             $stats = [
-                'total_registered' => $registeredEvents->count(), // Count all registered events
-                'attended_events' => $registeredEvents->where('status', 'attended')->count(),
+                'total_registered' => $activeEvents->count(), // Count only registered/attended events
+                'attended_events' => $activeEvents->where('status', 'attended')->count(),
                 'upcoming_events' => $upcomingEvents->count(),
             ];
 
@@ -194,7 +236,14 @@ class ParticipantDashboardController extends Controller
                 'current_time' => now()->toDateTimeString()
             ]);
 
-            return view('participant.dashboard', compact('upcomingEvents', 'pastEvents', 'stats', 'paymentHistory'));
+            // Debug: Log what's being passed to the view
+            Log::info('Passing to view:', [
+                'userFeedbacks_count' => count($userFeedbacks),
+                'userFeedbacks_event_ids' => array_keys($userFeedbacks),
+                'userFeedbacks_full' => json_encode($userFeedbacks)
+            ]);
+
+            return view('participant.dashboard', compact('upcomingEvents', 'pastEvents', 'stats', 'paymentHistory', 'userFeedbacks'));
         } catch (\Exception $e) {
             Log::error('Dashboard error: ' . $e->getMessage());
             return view('participant.dashboard', [
@@ -202,6 +251,7 @@ class ParticipantDashboardController extends Controller
                 'pastEvents' => collect([]),
                 'stats' => ['total_registered' => 0, 'attended_events' => 0, 'upcoming_events' => 0],
                 'paymentHistory' => collect([]),
+                'userFeedbacks' => [],
                 'error' => 'Tidak dapat memuat data dari server'
             ]);
         }

@@ -17,6 +17,24 @@
         </div>
         @endif
 
+        @if(session('error'))
+        <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
+        </div>
+        @endif
+
+        @if(session('success'))
+        <div class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+            <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
+        </div>
+        @endif
+
+        @if(session('info'))
+        <div class="mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+            <i class="fas fa-info-circle mr-2"></i>{{ session('info') }}
+        </div>
+        @endif
+
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div class="bg-white overflow-hidden shadow-lg rounded-xl hover:shadow-xl transition-shadow">
@@ -103,6 +121,7 @@
                                     $event = $participant->event ?? null;
                                     if (!$event) continue;
                                     $startDate = isset($event->start_date) ? \Carbon\Carbon::parse($event->start_date) : null;
+                                    $status = $participant->status ?? 'registered';
                                 @endphp
                                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                                     <div class="flex items-start justify-between">
@@ -124,9 +143,32 @@
                                             </div>
                                         </div>
                                         <div class="flex flex-col items-end gap-2 ml-4">
-                                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                                <i class="fas fa-check mr-1"></i>Registered
-                                            </span>
+                                            @if($status === 'attended')
+                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                                    <i class="fas fa-check-circle mr-1"></i>Attended
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                                    <i class="fas fa-check mr-1"></i>Registered
+                                                </span>
+                                            @endif
+
+                                            @if($status === 'attended')
+                                                @php
+                                                    // Defensive check: ensure $userFeedbacks exists and is an array
+                                                    $hasFeedback = isset($userFeedbacks) && is_array($userFeedbacks) && isset($userFeedbacks[$event->id ?? 0]);
+                                                @endphp
+                                                @if($hasFeedback)
+                                                    <a href="{{ route('participant.feedback.certificate.download', $event->id ?? 0) }}" class="inline-flex items-center text-green-600 hover:text-green-700 text-sm font-medium">
+                                                        <i class="fas fa-certificate mr-1"></i>Download Certificate
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('participant.feedback.create', $event->id ?? 0) }}" class="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+                                                        <i class="fas fa-comment-dots mr-1"></i>Give Feedback
+                                                    </a>
+                                                @endif
+                                            @endif
+
                                             <a href="{{ route('events.show', $event->id ?? 0) }}" class="text-red-600 hover:text-red-700 text-sm font-medium">
                                                 View Details <i class="fas fa-arrow-right ml-1"></i>
                                             </a>
@@ -186,6 +228,23 @@
                                                     <i class="fas fa-times-circle mr-1"></i>Not Attended
                                                 </span>
                                             @endif
+
+                                            @if($status === 'attended')
+                                                @php
+                                                    // Defensive check: ensure $userFeedbacks exists and is an array
+                                                    $hasFeedback = isset($userFeedbacks) && is_array($userFeedbacks) && isset($userFeedbacks[$event->id ?? 0]);
+                                                @endphp
+                                                @if($hasFeedback)
+                                                    <a href="{{ route('participant.feedback.certificate.download', $event->id ?? 0) }}" class="inline-flex items-center text-green-600 hover:text-green-700 text-sm font-medium">
+                                                        <i class="fas fa-certificate mr-1"></i>
+                                                    </a>
+                                                @else
+                                                    <a href="{{ route('participant.feedback.create', $event->id ?? 0) }}" class="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium">
+                                                        <i class="fas fa-comment-dots mr-1"></i>Give Feedback
+                                                    </a>
+                                                @endif
+                                            @endif
+
                                             <a href="{{ route('events.show', $event->id ?? 0) }}" class="text-red-600 hover:text-red-700 text-sm font-medium">
                                                 View Details <i class="fas fa-arrow-right ml-1"></i>
                                             </a>
@@ -217,13 +276,13 @@
                             <a href="{{ route('events.index') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors shadow-md">
                                 <i class="fas fa-search mr-2"></i>Browse Events
                             </a>
-                            <a href="{{ route('my.participations') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md">
-                                <i class="fas fa-qrcode mr-2"></i>My QR Codes
+                            <a href="{{ route('attendance.scanner') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-md">
+                                <i class="fas fa-qrcode mr-2"></i>Scan QR Code
                             </a>
                             <a href="{{ route('participant.profile') }}" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                                 <i class="fas fa-user mr-2"></i>Edit Profile
                             </a>
-                            <a href="#" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <a href="#" onclick="switchTab('past'); return false;" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                                 <i class="fas fa-certificate mr-2"></i>My Certificates
                             </a>
                         </div>
@@ -558,8 +617,14 @@ function removeBookmark(eventId) {
 // Load bookmarked events from API
 async function loadBookmarkedEvents() {
     const container = document.getElementById('bookmarkedEventsContainer');
+
+    // Don't load if container doesn't exist
+    if (!container) {
+        return;
+    }
+
     const bookmarkIds = BookmarkManager.getBookmarks();
-    
+
     if (bookmarkIds.length === 0) {
         container.innerHTML = `
             <div class="text-center py-12">

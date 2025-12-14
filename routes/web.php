@@ -15,6 +15,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\EventParticipationController;
+use App\Http\Controllers\FeedbackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -86,6 +87,13 @@ Route::middleware(['api.auth', 'api.role:participant'])->group(function () {
     Route::delete('/{event}', [BookmarkController::class, 'destroy'])->name('destroy');
     Route::get('/{event}/check', [BookmarkController::class, 'check'])->name('check');
     });
+
+    // Feedback
+    Route::prefix('participant/feedback')->name('participant.feedback.')->group(function () {
+        Route::get('/create/{event}', [FeedbackController::class, 'create'])->name('create');
+        Route::post('/store/{event}', [FeedbackController::class, 'store'])->name('store');
+        Route::get('/certificate/{event}/download', [FeedbackController::class, 'downloadCertificate'])->name('certificate.download');
+    });
 });
 
 // Public Event Search & Browse (Available to all users)
@@ -101,6 +109,9 @@ Route::middleware(['api.auth'])->group(function () {
     Route::get('/participations/{participation}/qr-code', [EventParticipationController::class, 'showQrCode'])->name('participations.qr-code');
     Route::delete('/participations/{participation}', [EventParticipationController::class, 'cancel'])->name('participations.cancel');
     Route::post('/events/{event}/attendance', [EventParticipationController::class, 'checkAttendance'])->name('events.check-attendance');
+
+    // Payment creation
+    Route::post('/events/{event}/payment', [PaymentController::class, 'createPayment'])->name('events.payment.create');
 });
 
 // Payment pages

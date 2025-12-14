@@ -1,4 +1,4 @@
-@extends('layout')
+@extends('participant.layout')
 
 @section('title', 'My Participations')
 

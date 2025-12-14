@@ -167,11 +167,18 @@
                                 <span class="text-red-800 font-medium">Event Full</span>
                             </div>
                         </div>
-                    <?php elseif($event->start_date < now()): ?>
+                    <?php elseif($event->end_date < now()): ?>
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                             <div class="flex items-center">
-                                <i class="fas fa-clock text-gray-600 mr-2"></i>
-                                <span class="text-gray-800 font-medium">Event Started</span>
+                                <i class="fas fa-check-circle text-gray-600 mr-2"></i>
+                                <span class="text-gray-800 font-medium">Event Ended</span>
+                            </div>
+                        </div>
+                    <?php elseif($event->start_date < now()): ?>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-circle-notch fa-spin text-blue-600 mr-2"></i>
+                                <span class="text-blue-800 font-medium">Event Started</span>
                             </div>
                         </div>
                     <?php else: ?>
@@ -187,30 +194,48 @@
 <?php if(session('user')): ?>
     <?php if($isParticipating ?? false): ?>
         <!-- Already Registered -->
-        <a href="<?php echo e(route('my.participations')); ?>" class="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 mb-3 inline-block text-center">
-            <i class="fas fa-check-circle mr-2"></i>View My QR Code
+        <a href="<?php echo e(route('attendance.scanner')); ?>" class="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 mb-3 inline-block text-center">
+            <i class="fas fa-check-circle mr-2"></i>Already Registered
         </a>
     <?php elseif($event->quota > 0 && $event->registered_count >= $event->quota): ?>
         <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
             <i class="fas fa-times mr-2"></i>Event Full
+        </button>
+    <?php elseif($event->end_date < now()): ?>
+        <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
+            <i class="fas fa-check-circle mr-2"></i>Event Ended
         </button>
     <?php elseif($event->start_date < now()): ?>
         <button class="w-full bg-gray-400 text-white py-3 rounded-lg font-medium mb-3" disabled>
             <i class="fas fa-clock mr-2"></i>Event Started
         </button>
     <?php else: ?>
-        <!-- Join Event Form -->
-        <form action="<?php echo e(route('events.register', $event->id)); ?>" method="POST" id="joinEventForm" onsubmit="handleJoinSubmit(event)">
-            <?php echo csrf_field(); ?>
-            <button type="submit" id="joinEventBtn" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 disabled:bg-gray-400 disabled:cursor-not-allowed">
+        <!-- Join Event Button -->
+        <?php if($event->price > 0): ?>
+            <!-- Paid Event - Direct Payment -->
+            <button onclick="handleJoinEvent()" id="joinEventBtn" data-event-id="<?php echo e($event->id); ?>" data-event-price="<?php echo e($event->price); ?>" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <span id="joinBtnText">
-                    <i class="fas fa-plus mr-2"></i>Join Event Now
+                    <i class="fas fa-credit-card mr-2"></i>Pay Rp <?php echo e(number_format($event->price)); ?>
+
                 </span>
                 <span id="joinBtnLoading" class="hidden">
-                    <i class="fas fa-spinner fa-spin mr-2"></i>Joining...
+                    <i class="fas fa-spinner fa-spin mr-2"></i>Processing...
                 </span>
             </button>
-        </form>
+        <?php else: ?>
+            <!-- Free Event - Direct Registration -->
+            <form action="<?php echo e(route('events.register', $event->id)); ?>" method="POST" id="joinEventForm" onsubmit="handleJoinSubmit(event)">
+                <?php echo csrf_field(); ?>
+                <button type="submit" id="joinEventBtn" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <span id="joinBtnText">
+                        <i class="fas fa-plus mr-2"></i>Join Event (Free)
+                    </span>
+                    <span id="joinBtnLoading" class="hidden">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>Joining...
+                    </span>
+                </button>
+            </form>
+        <?php endif; ?>
     <?php endif; ?>
 <?php else: ?>
     <a href="<?php echo e(route('login')); ?>" class="w-full bg-red-600 text-white py-3 rounded-lg font-medium hover:bg-red-700 transition-colors duration-200 mb-3 inline-block text-center">
@@ -267,184 +292,9 @@
     </div>
 </div>
 
-<!-- Payment Method Modal -->
-<div id="paymentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Choose Payment Method</h3>
-                <button onclick="hidePaymentModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <!-- Event Info -->
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <h4 class="font-semibold text-gray-900"><?php echo e($event->title); ?></h4>
-                <p class="text-sm text-gray-600"><?php echo e($event->start_date->format('M d, Y H:i')); ?></p>
-                <p class="text-lg font-bold text-primary">Rp <?php echo e(number_format($event->price)); ?></p>
-            </div>
-
-            <!-- Payment Methods -->
-            <div class="space-y-3">
-                <!-- Invoice Payment -->
-                <button onclick="createPayment('invoice')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-credit-card text-2xl text-blue-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">Credit Card</h5>
-                        <p class="text-sm text-gray-600">Visa, Mastercard, JCB</p>
-                    </div>
-                </button>
-
-                <!-- Virtual Account -->
-                <button onclick="showBankSelection()" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-university text-2xl text-green-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">Virtual Account</h5>
-                        <p class="text-sm text-gray-600">BCA, BNI, BRI, Mandiri</p>
-                    </div>
-                </button>
-
-                <!-- E-Wallet -->
-                <button onclick="showEWalletSelection()" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt text-2xl text-purple-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">E-Wallet</h5>
-                        <p class="text-sm text-gray-600">OVO, DANA, LinkAja, ShopeePay</p>
-                    </div>
-                </button>
-            </div>
-
-            <!-- Loading State -->
-            <div id="paymentLoading" class="hidden text-center py-4">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p class="text-sm text-gray-600 mt-2">Processing payment...</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Bank Selection Modal -->
-<div id="bankModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Select Bank</h3>
-                <button onclick="hideBankModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="space-y-3">
-                <button onclick="createPayment('virtual_account', 'BCA')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-university text-2xl text-blue-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">BCA</h5>
-                        <p class="text-sm text-gray-600">Bank Central Asia</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('virtual_account', 'BNI')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-university text-2xl text-red-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">BNI</h5>
-                        <p class="text-sm text-gray-600">Bank Negara Indonesia</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('virtual_account', 'BRI')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-university text-2xl text-green-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">BRI</h5>
-                        <p class="text-sm text-gray-600">Bank Rakyat Indonesia</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('virtual_account', 'MANDIRI')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-university text-2xl text-yellow-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">Mandiri</h5>
-                        <p class="text-sm text-gray-600">Bank Mandiri</p>
-                    </div>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- E-Wallet Selection Modal -->
-<div id="ewalletModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Select E-Wallet</h3>
-                <button onclick="hideEWalletModal()" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="space-y-3">
-                <button onclick="createPayment('ewallet', 'OVO')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt text-2xl text-purple-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">OVO</h5>
-                        <p class="text-sm text-gray-600">Digital Wallet</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('ewallet', 'DANA')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt text-2xl text-blue-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">DANA</h5>
-                        <p class="text-sm text-gray-600">Digital Wallet</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('ewallet', 'LINKAJA')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt text-2xl text-green-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">LinkAja</h5>
-                        <p class="text-sm text-gray-600">Digital Wallet</p>
-                    </div>
-                </button>
-
-                <button onclick="createPayment('ewallet', 'SHOPEEPAY')" class="w-full flex items-center p-4 border border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-colors">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-mobile-alt text-2xl text-orange-600"></i>
-                    </div>
-                    <div class="ml-4 text-left">
-                        <h5 class="font-medium text-gray-900">ShopeePay</h5>
-                        <p class="text-sm text-gray-600">Digital Wallet</p>
-                    </div>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 <?php $__env->stopSection(); ?>
 
-<?php $__env->startSection('scripts'); ?>
+<?php $__env->startPush('scripts'); ?>
 <script>
     // Get CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -480,111 +330,63 @@
         }
     }
 
-    function showPaymentModal() {
-        document.getElementById('paymentModal').classList.remove('hidden');
-    }
+    // Handle join event - Direct payment for paid events
+    async function handleJoinEvent() {
+        const btn = document.getElementById('joinEventBtn');
+        const btnText = document.getElementById('joinBtnText');
+        const btnLoading = document.getElementById('joinBtnLoading');
+        const eventId = btn.dataset.eventId;
 
-    function hidePaymentModal() {
-        document.getElementById('paymentModal').classList.add('hidden');
-    }
+        try {
+            // Show loading state
+            btn.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
 
-    function showBankSelection() {
-        hidePaymentModal();
-        document.getElementById('bankModal').classList.remove('hidden');
-    }
+            console.log('Creating payment for event:', eventId);
 
-    function hideBankModal() {
-        document.getElementById('bankModal').classList.add('hidden');
-        showPaymentModal();
-    }
+            // Create payment via frontend API (always uses Xendit Invoice)
+            const response = await fetch(`/events/${eventId}/payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({
+                    payment_method: 'invoice'
+                })
+            });
 
-    function showEWalletSelection() {
-        hidePaymentModal();
-        document.getElementById('ewalletModal').classList.remove('hidden');
-    }
+            const data = await response.json();
+            console.log('Payment response:', data);
 
-    function hideEWalletModal() {
-        document.getElementById('ewalletModal').classList.add('hidden');
-        showPaymentModal();
-    }
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create payment');
+            }
 
-    function createPayment(paymentMethod, provider = null) {
-        // Show loading
-        document.getElementById('paymentLoading').classList.remove('hidden');
-        
-        // Hide all modals
-        hidePaymentModal();
-        hideBankModal();
-        hideEWalletModal();
+            if (data.success && data.data && data.data.payment_url) {
+                // Show success message
+                showToast('Redirecting to payment...', 'success');
 
-        // Prepare payment data
-        const paymentData = {
-            event_id: <?php echo e($event->id); ?>,
-            payment_method: paymentMethod
-        };
+                // Small delay for better UX
+                setTimeout(() => {
+                    // Redirect to Xendit invoice page
+                    window.location.href = data.data.payment_url;
+                }, 500);
+            } else {
+                throw new Error(data.message || 'No payment URL received');
+            }
 
-        if (paymentMethod === 'virtual_account' && provider) {
-            paymentData.bank_code = provider;
-        } else if (paymentMethod === 'ewallet' && provider) {
-            paymentData.ewallet_type = provider;
+        } catch (error) {
+            console.error('Payment error:', error);
+            showToast(error.message || 'Failed to process payment', 'error');
+
+            // Restore button state
+            btn.disabled = false;
+            btnText.classList.remove('hidden');
+            btnLoading.classList.add('hidden');
         }
-
-        // Create payment
-        fetch('/api/payments/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': 'Bearer ' + accessToken,
-                'X-CSRF-TOKEN': csrfToken
-            },
-            body: JSON.stringify(paymentData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('paymentLoading').classList.add('hidden');
-            
-            if (data.success) {
-                // Redirect to payment URL
-                if (data.data.payment_url) {
-                    // Direct redirect to Xendit payment page
-                    window.location.href = data.data.payment_url;
-                } else {
-                    // If no payment URL (free event), show success and reload
-                    alert('Payment created successfully!');
-                    location.reload();
-                }
-            } else {
-                // Show detailed error message but don't prevent retry
-                let errorMessage = 'Error: ' + data.message;
-                if (data.errors) {
-                    errorMessage += '\n\nDetails:';
-                    for (const [field, errors] of Object.entries(data.errors)) {
-                        errorMessage += '\n• ' + field + ': ' + errors.join(', ');
-                    }
-                }
-                
-                // If payment URL exists in error response, still redirect
-                if (data.data && data.data.payment_url) {
-                    console.warn('Error but payment URL exists, redirecting:', errorMessage);
-                    window.location.href = data.data.payment_url;
-                } else {
-                    alert(errorMessage);
-                }
-            }
-        })
-        .catch(error => {
-            document.getElementById('paymentLoading').classList.add('hidden');
-            console.error('Error:', error);
-            
-            // Try to get payment URL from error response if available
-            if (error.response && error.response.data && error.response.data.payment_url) {
-                console.warn('Error but payment URL exists, redirecting:', error.response.data.payment_url);
-                window.location.href = error.response.data.payment_url;
-            } else {
-                alert('An error occurred while creating payment. Please try again.');
-            }
-        });
     }
 
     // Share functionality
@@ -602,15 +404,6 @@
                     window.open(`https://wa.me/?text=${encodeURIComponent(title + ' - ' + url)}`, '_blank');
                 }
             });
-        }
-    });
-
-    // Close modals when clicking outside
-    document.addEventListener('click', function(event) {
-        if (event.target.classList.contains('fixed')) {
-            hidePaymentModal();
-            hideBankModal();
-            hideEWalletModal();
         }
     });
 </script>
@@ -652,7 +445,8 @@
         }
     };
 
-    function toggleBookmark(eventId) {
+    // Make function globally accessible for onclick handler
+    window.toggleBookmark = function(eventId) {
         console.log('Detail bookmark clicked!', eventId);
         const btn = document.getElementById('bookmarkBtn');
         const text = document.getElementById('bookmarkText');
@@ -674,13 +468,13 @@
                 btn.classList.add('bg-red-600', 'text-white');
                 text.textContent = 'Bookmarked';
                 btn.dataset.bookmarked = 'true';
-                showToast('Event bookmarked successfully! 🎉', 'success');
+                showToast('Event bookmarked! 🎉', 'success');
             }
         } catch (error) {
             console.error('Bookmark toggle error:', error);
             showToast('Failed to toggle bookmark', 'error');
         }
-    }
+    };
 
     // Check bookmark status on page load
     document.addEventListener('DOMContentLoaded', function() {
@@ -756,7 +550,7 @@
 <?php if(session('success')): ?>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        showNotification('✓ Success!', '<?php echo e(session('success')); ?>', 'success');
+        showToast('<?php echo e(session('success')); ?>', 'success');
     });
 </script>
 <?php endif; ?>
@@ -764,7 +558,7 @@
 <?php if(session('error')): ?>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        showNotification('✗ Error', '<?php echo e(session('error')); ?>', 'error');
+        showToast('<?php echo e(session('error')); ?>', 'error');
     });
 </script>
 <?php endif; ?>
@@ -772,7 +566,7 @@
 <?php if(session('info')): ?>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        showNotification('ℹ Info', '<?php echo e(session('info')); ?>', 'info');
+        showToast('<?php echo e(session('info')); ?>', 'info');
     });
 </script>
 <?php endif; ?>
@@ -792,6 +586,6 @@
         animation: slide-in 0.3s ease-out;
     }
 </style>
-<?php $__env->stopSection(); ?>
+<?php $__env->stopPush(); ?>
 
 <?php echo $__env->make('participant.layout', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Study\Kuliah\Semester-7\CP\event-connect\resources\views/participant/events/show.blade.php ENDPATH**/ ?>

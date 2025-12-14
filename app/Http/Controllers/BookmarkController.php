@@ -29,7 +29,8 @@ class BookmarkController extends Controller
             // Get all published events for bookmark filtering in frontend
             $eventsResponse = $this->api->withToken($token)->get('events', [
                 'status' => 'published',
-                'per_page' => 100
+                'per_page' => 100,
+                'include_past' => true,
             ]);
 
             // Extract events array from paginated response

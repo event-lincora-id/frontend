@@ -168,7 +168,11 @@ public function index(Request $request): View
         ]);
         
         // Build API query parameters
-        $params = ['per_page' => 20];
+        // Include past events so users can browse and view event history
+        $params = [
+            'per_page' => 20,
+            'include_past' => true
+        ];
 
         // Add search parameter
         if ($request->filled('search')) {

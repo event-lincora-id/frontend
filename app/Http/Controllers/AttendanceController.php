@@ -66,18 +66,18 @@ class AttendanceController extends Controller
 
         try {
             $token = Session::get('api_token');
-            $response = $this->api->withToken($token)->post('attendance/mark', [
+            $response = $this->api->withToken($token)->post('participants/attendance', [
                 'qr_code' => $request->qr_code,
             ]);
 
             if (isset($response['success']) && $response['success']) {
-                return redirect()->back()->with('success', $response['message'] ?? 'Attendance marked successfully');
+                return redirect()->back()->with('success', $response['message'] ?? 'Attendance marked successfully!');
             }
 
             return redirect()->back()->with('error', $response['message'] ?? 'Failed to mark attendance');
         } catch (\Exception $e) {
             Log::error('Mark attendance error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Unable to mark attendance');
+            return redirect()->back()->with('error', 'Unable to mark attendance: ' . $e->getMessage());
         }
     }
 

@@ -167,8 +167,8 @@
                         
                         <!-- Bookmark Button -->
                         @if(session('user'))
-                            <button 
-                                onclick="toggleBookmarkCard({{ $event->id }}, this, event)"
+                            <button
+                                onclick="event.preventDefault(); event.stopPropagation(); toggleBookmarkCard({{ $event->id }}, this);"
                                 class="bookmark-btn-card absolute top-3 right-3 w-10 h-10 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center bg-white text-gray-700 hover:bg-gray-100"
                                 data-event-id="{{ $event->id }}"
                                 data-bookmarked="false"
@@ -269,7 +269,7 @@
 </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
 <style>
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
@@ -384,81 +384,49 @@
 </script>
 
 <script>
-    // Bookmark Manager - API-based (synced with backend)
+    // Bookmark Manager - localStorage-based
     const BookmarkManager = {
-        // Toggle bookmark via API
-        async toggle(eventId) {
-            try {
-                const response = await fetch(`/participant/bookmarks/${eventId}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    }
-                });
+        STORAGE_KEY: 'event_bookmarks',
 
-                const data = await response.json();
+        getBookmarks() {
+            const bookmarks = localStorage.getItem(this.STORAGE_KEY);
+            return bookmarks ? JSON.parse(bookmarks) : [];
+        },
 
-                if (!data.success) {
-                    throw new Error(data.message || 'Failed to toggle bookmark');
-                }
+        saveBookmarks(bookmarks) {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(bookmarks));
+        },
 
-                return data.data?.is_bookmarked ?? false;
-            } catch (error) {
-                console.error('Bookmark toggle error:', error);
-                throw error;
+        toggle(eventId) {
+            const bookmarks = this.getBookmarks();
+            const index = bookmarks.indexOf(eventId);
+
+            if (index > -1) {
+                // Remove bookmark
+                bookmarks.splice(index, 1);
+                this.saveBookmarks(bookmarks);
+                return false; // not bookmarked
+            } else {
+                // Add bookmark
+                bookmarks.push(eventId);
+                this.saveBookmarks(bookmarks);
+                return true; // bookmarked
             }
         },
 
-        // Check if event is bookmarked via API
-        async check(eventId) {
-            try {
-                const response = await fetch(`/participant/bookmarks/${eventId}/check`, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-
-                if (!response.ok) {
-                    console.warn(`⚠️ Bookmark check failed for event ${eventId}: HTTP ${response.status}`);
-                    const errorText = await response.text();
-                    console.warn('Response:', errorText);
-                    return false;
-                }
-
-                const data = await response.json();
-                console.log(`📋 API response for event ${eventId}:`, data);
-
-                // Handle different possible response structures
-                if (data.success === false) {
-                    console.warn(`⚠️ API returned success=false for event ${eventId}:`, data.message);
-                    return false;
-                }
-
-                return data.data?.is_bookmarked ?? false;
-            } catch (error) {
-                console.error('❌ Bookmark check error:', error);
-                return false;
-            }
+        check(eventId) {
+            return this.getBookmarks().includes(eventId);
         }
     };
 
     // Make function globally accessible for onclick handlers
-    window.toggleBookmarkCard = async function(eventId, button, event) {
+    window.toggleBookmarkCard = function(eventId, button) {
         console.log('🔖 Bookmark card clicked!', eventId);
-        event.preventDefault();
-        event.stopPropagation();
-
-        // Disable button during API call
-        button.disabled = true;
-        button.style.opacity = '0.6';
 
         try {
-            const isBookmarked = await BookmarkManager.toggle(eventId);
+            const isBookmarked = BookmarkManager.toggle(eventId);
 
-            // Update UI based on API response
+            // Update UI based on toggle result
             if (isBookmarked) {
                 button.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-100');
                 button.classList.add('bg-red-600', 'text-white');
@@ -473,11 +441,8 @@
                 showToast('Bookmark removed', 'info');
             }
         } catch (error) {
-            showToast('Failed to update bookmark. Please try again.', 'error');
-        } finally {
-            // Re-enable button
-            button.disabled = false;
-            button.style.opacity = '1';
+            console.error('Bookmark error:', error);
+            showToast('Failed to update bookmark', 'error');
         }
     };
 
@@ -499,38 +464,34 @@
     }
 
     // Initialize bookmarks on page load
-    document.addEventListener('DOMContentLoaded', async function() {
+    document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Initializing explore bookmarks...');
 
         const buttons = document.querySelectorAll('.bookmark-btn-card');
         console.log(`Found ${buttons.length} bookmark buttons`);
 
-        // Check bookmark status from backend API for each button
-        for (const btn of buttons) {
+        // Check bookmark status from localStorage for each button
+        buttons.forEach(btn => {
             const eventId = parseInt(btn.dataset.eventId);
 
             if (eventId) {
-                try {
-                    const isBookmarked = await BookmarkManager.check(eventId);
-                    console.log(`Event ${eventId} bookmark status:`, isBookmarked);
+                const isBookmarked = BookmarkManager.check(eventId);
+                console.log(`Event ${eventId} bookmark status:`, isBookmarked);
 
-                    if (isBookmarked) {
-                        btn.classList.remove('bg-white', 'text-gray-700');
-                        btn.classList.add('bg-red-600', 'text-white');
-                        btn.setAttribute('data-bookmarked', 'true');
-                        console.log(`✓ Event ${eventId} marked as bookmarked`);
-                    }
-                } catch (error) {
-                    console.error(`Failed to check bookmark status for event ${eventId}:`, error);
+                if (isBookmarked) {
+                    btn.classList.remove('bg-white', 'text-gray-700');
+                    btn.classList.add('bg-red-600', 'text-white');
+                    btn.setAttribute('data-bookmarked', 'true');
+                    console.log(`✓ Event ${eventId} marked as bookmarked`);
                 }
             }
-        }
+        });
 
         console.log('✅ Bookmarks initialized!');
     });
 </script>
 
-@endsection
+@endpush
 
 
 

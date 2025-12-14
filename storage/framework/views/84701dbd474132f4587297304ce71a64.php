@@ -1,8 +1,6 @@
-@extends('participant.layout')
+<?php $__env->startSection('title', 'Scan QR Code - Event Connect'); ?>
 
-@section('title', 'Scan QR Code - Event Connect')
-
-@section('content')
+<?php $__env->startSection('content'); ?>
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-white rounded-lg shadow-lg p-6">
         <div class="mb-6">
@@ -10,17 +8,17 @@
             <p class="text-gray-600">Scan the QR code provided by the event organizer to mark your attendance</p>
         </div>
 
-        @if(session('success'))
+        <?php if(session('success')): ?>
             <div class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                <span class="block sm:inline">{{ session('success') }}</span>
+                <span class="block sm:inline"><?php echo e(session('success')); ?></span>
             </div>
-        @endif
+        <?php endif; ?>
 
-        @if(session('error'))
+        <?php if(session('error')): ?>
             <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                <span class="block sm:inline">{{ session('error') }}</span>
+                <span class="block sm:inline"><?php echo e(session('error')); ?></span>
             </div>
-        @endif
+        <?php endif; ?>
 
         <div class="mb-6">
             <div id="scanner-container" class="relative bg-gray-100 rounded-lg overflow-hidden" style="min-height: 400px;">
@@ -55,8 +53,8 @@
             <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div class="mt-3">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Enter QR Code Manually</h3>
-                    <form id="manual-form" method="POST" action="{{ route('attendance.mark') }}">
-                        @csrf
+                    <form id="manual-form" method="POST" action="<?php echo e(route('attendance.mark')); ?>">
+                        <?php echo csrf_field(); ?>
                         <div class="mb-4">
                             <label for="qr_code" class="block text-sm font-medium text-gray-700 mb-2">QR Code</label>
                             <input type="text" id="qr_code" name="qr_code" required
@@ -90,9 +88,9 @@
         </ul>
     </div>
 </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
     let scannerActive = false;
@@ -186,12 +184,12 @@
         // Create form and submit
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '{{ route("attendance.mark") }}';
+        form.action = '<?php echo e(route("attendance.mark")); ?>';
         
         const csrfInput = document.createElement('input');
         csrfInput.type = 'hidden';
         csrfInput.name = '_token';
-        csrfInput.value = '{{ csrf_token() }}';
+        csrfInput.value = '<?php echo e(csrf_token()); ?>';
         form.appendChild(csrfInput);
         
         const qrInput = document.createElement('input');
@@ -209,5 +207,7 @@
         stopScanner();
     });
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
 
+
+<?php echo $__env->make('participant.layout', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\Study\Kuliah\Semester-7\CP\event-connect\resources\views/participant/attendance/scanner.blade.php ENDPATH**/ ?>

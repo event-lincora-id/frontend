@@ -153,7 +153,7 @@ class AdminDashboardController extends Controller
             
             // Calculate total participants from all events
             $totalParticipants = $events->sum(function($event) {
-                return $event['participants_count'] ?? $event['registered_count'] ?? 0;
+                return $event['registered_count'] ?? 0;
             });
 
             return [
@@ -175,7 +175,7 @@ class AdminDashboardController extends Controller
                 'this_month_participants' => $events->filter(function($event) use ($now) {
                     return isset($event['created_at']) && Carbon::parse($event['created_at'])->month === $now->month;
                 })->sum(function($event) {
-                    return $event['participants_count'] ?? $event['registered_count'] ?? 0;
+                    return $event['registered_count'] ?? 0;
                 }),
             ];
         } catch (\Exception $e) {
@@ -302,13 +302,13 @@ class AdminDashboardController extends Controller
             }
             
             return $events
-                ->sortByDesc('participants_count')
+                ->sortByDesc('registered_count')
                 ->take(5)
                 ->map(function($event) {
                     return (object)[
                         'id' => $event['id'] ?? null,
                         'title' => $event['title'] ?? 'Untitled',
-                        'participants_count' => $event['participants_count'] ?? 0,
+                        'participants_count' => $event['registered_count'] ?? 0,
                         'start_date' => isset($event['start_date']) ? Carbon::parse($event['start_date']) : null,
                         'organizer' => (object)[
                             'full_name' => $event['organizer']['full_name'] ?? $event['organizer']['name'] ?? 'Unknown',

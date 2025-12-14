@@ -74,6 +74,35 @@ class BackendApiService
     }
 
     /**
+     * Perform a GET request and return raw response (for file downloads).
+     */
+    public function getRaw(string $endpoint, array $query = [], ?string $token = null): array
+    {
+        $endpoint = '/' . ltrim($endpoint, '/');
+        $client = clone $this->client;
+
+        if ($token) {
+            $client = $client->withToken($token);
+        }
+
+        try {
+            $response = $client->get($endpoint, $query);
+
+            return [
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body' => $response->body(),
+            ];
+        } catch (\Exception $e) {
+            throw new BackendApiException(
+                "Failed to fetch raw response: " . $e->getMessage(),
+                null,
+                $e
+            );
+        }
+    }
+
+    /**
      * Return a cloned instance that carries the given bearer token.
      */
     public function withToken(?string $token): self

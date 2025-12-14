@@ -33,7 +33,7 @@
                             
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Date:</span>
-                                <span class="font-medium text-gray-900">{{ $event->start_date->format('M d, Y H:i') }}</span>
+                                <span class="font-medium text-gray-900">{{ \Carbon\Carbon::parse($event->start_date)->format('M d, Y H:i') }}</span>
                             </div>
                             
                             <div class="flex justify-between">
@@ -94,8 +94,38 @@
         </div>
     </div>
 
-    <!-- Auto redirect after 10 seconds -->
+    <!-- Verify payment status on page load -->
     <script>
+        // CRITICAL: Call backend to verify payment and update participant status
+        @if($participant)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Verifying payment status for participant {{ $participant->id }}...');
+
+            fetch('{{ env("API_BASE_URL") }}/payments/status/{{ $participant->id }}', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': 'Bearer {{ Session::get("api_token") }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Payment verification response:', data);
+
+                if (data.success && data.data.is_paid) {
+                    console.log('✅ Payment verified and participant status updated');
+                } else {
+                    console.warn('⚠️ Payment verification returned unexpected status:', data);
+                }
+            })
+            .catch(error => {
+                console.error('Failed to verify payment status:', error);
+            });
+        });
+        @endif
+
+        // Auto redirect after 10 seconds
         setTimeout(function() {
             @if(auth()->check())
                 window.location.href = "{{ route('participant.dashboard') }}";
