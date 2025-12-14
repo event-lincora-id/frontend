@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\SuperAdminController;
+use App\Http\Controllers\DebugController;
 use App\Http\Controllers\ParticipantDashboardController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
@@ -176,4 +178,25 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
 
+});
+
+// Super Admin Routes (Platform-wide management)
+Route::middleware(['api.auth', 'api.role:super_admin'])->prefix('super-admin')->name('super.admin.')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [SuperAdminController::class, 'dashboard'])->name('dashboard');
+    
+    // Organizers Management
+    Route::get('/organizers', [SuperAdminController::class, 'organizers'])->name('organizers');
+    Route::get('/organizers/{id}', [SuperAdminController::class, 'organizerDetail'])->name('organizer.detail');
+    Route::post('/organizers/{id}/toggle', [SuperAdminController::class, 'toggleOrganizerStatus'])->name('organizer.toggle');
+    
+    // Events Management
+    Route::get('/events', [SuperAdminController::class, 'events'])->name('events');
+    Route::get('/events/{id}', [SuperAdminController::class, 'eventDetail'])->name('event.detail');
+    
+    // Users Management
+    Route::get('/users', [SuperAdminController::class, 'users'])->name('users');
+    
+    // Debug endpoint
+    Route::get('/debug/api', [DebugController::class, 'testSuperAdminApi'])->name('debug.api');
 });

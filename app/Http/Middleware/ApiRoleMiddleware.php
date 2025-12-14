@@ -19,12 +19,16 @@ class ApiRoleMiddleware
         $userRole = is_array($user) ? ($user['role'] ?? null) : ($user->role ?? null);
         
         // Check if user has required role
+        if ($role === 'super_admin' && $userRole !== 'super_admin') {
+            abort(403, 'Unauthorized access. Super admin role required.');
+        }
+        
         if ($role === 'admin' && !in_array($userRole, ['admin', 'super_admin'])) {
-            abort(403, 'Unauthorized access');
+            abort(403, 'Unauthorized access. Admin role required.');
         }
         
         if ($role === 'participant' && $userRole !== 'participant') {
-            abort(403, 'Unauthorized access');
+            abort(403, 'Unauthorized access. Participant role required.');
         }
 
         return $next($request);
