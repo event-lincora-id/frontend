@@ -62,7 +62,7 @@ $message = $__bag->first($__errorArgs[0]); ?> border-red-500 <?php unset($messag
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" 
-                                   placeholder="Mulyadi Al Amin" value="<?php echo e(old('full_name')); ?>">
+                                   placeholder="Nama lengkap" value="<?php echo e(old('full_name')); ?>">
                             <?php $__errorArgs = ['full_name'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -86,7 +86,7 @@ $message = $__bag->first($__errorArgs[0]); ?> border-red-500 <?php unset($messag
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>" 
-                                   placeholder="tawonndazz57@gmail.com" value="<?php echo e(old('email')); ?>">
+                                   placeholder="email@gmail.com" value="<?php echo e(old('email')); ?>">
                             <?php $__errorArgs = ['email'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :

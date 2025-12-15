@@ -55,7 +55,7 @@
                             <label for="full_name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
                             <input id="full_name" name="full_name" type="text" autocomplete="name" required 
                                    class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('full_name') border-red-500 @enderror" 
-                                   placeholder="Mulyadi Al Amin" value="{{ old('full_name') }}">
+                                   placeholder="Nama lengkap" value="{{ old('full_name') }}">
                             @error('full_name')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -65,7 +65,7 @@
                             <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
                             <input id="email" name="email" type="email" autocomplete="email" required 
                                    class="mt-2 block w-full rounded-lg border border-gray-200 ring-1 ring-gray-100 px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:border-[#F4B6B6] focus:ring-2 focus:ring-[#F4B6B6] sm:text-sm transition @error('email') border-red-500 @enderror" 
-                                   placeholder="tawonndazz57@gmail.com" value="{{ old('email') }}">
+                                   placeholder="email@gmail.com" value="{{ old('email') }}">
                             @error('email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
