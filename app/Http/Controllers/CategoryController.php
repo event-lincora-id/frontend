@@ -61,7 +61,7 @@ class CategoryController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                \Log::info('Unable to fetch events for category counts: ' . $e->getMessage());
+                Log::info('Unable to fetch events for category counts: ' . $e->getMessage());
             }
 
             // Attach events_count to each category item

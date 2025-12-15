@@ -194,6 +194,12 @@ Route::middleware(['api.auth', 'api.role:super_admin'])->prefix('super-admin')->
     Route::get('/events', [SuperAdminController::class, 'events'])->name('events');
     Route::get('/events/{id}', [SuperAdminController::class, 'eventDetail'])->name('event.detail');
     
+    // Categories Management
+    Route::get('/categories', [SuperAdminController::class, 'categories'])->name('categories');
+    Route::post('/categories', [SuperAdminController::class, 'storeCategory'])->name('categories.store');
+    Route::put('/categories/{id}', [SuperAdminController::class, 'updateCategory'])->name('categories.update');
+    Route::delete('/categories/{id}', [SuperAdminController::class, 'destroyCategory'])->name('categories.destroy');
+    
     // Users Management
     Route::get('/users', [SuperAdminController::class, 'users'])->name('users');
     

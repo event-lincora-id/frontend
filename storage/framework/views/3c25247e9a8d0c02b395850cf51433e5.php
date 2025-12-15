@@ -84,6 +84,12 @@
                     <span>All Events</span>
                 </a>
 
+                <a href="<?php echo e(route('super.admin.categories')); ?>" 
+                   class="flex items-center px-6 py-3 <?php echo e(request()->routeIs('super.admin.categories*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10'); ?>">
+                    <i class="fas fa-tags w-5 mr-3"></i>
+                    <span>Categories</span>
+                </a>
+
                 <a href="<?php echo e(route('super.admin.users')); ?>" 
                    class="flex items-center px-6 py-3 <?php echo e(request()->routeIs('super.admin.users*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10'); ?>">
                     <i class="fas fa-users w-5 mr-3"></i>
