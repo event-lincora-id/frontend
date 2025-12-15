@@ -25,11 +25,54 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         try {
-            // Get categories from API (public endpoint, no auth needed for viewing)
+            // Get categories from API
             $response = $this->api->get('categories');
-            
+
             // API returns flat array in data, not paginated
             $categoriesData = $response['data'] ?? [];
+
+            // Build events count per category (for current admin's events only)
+            $eventsCountByCategory = [];
+            try {
+                $token = \Illuminate\Support\Facades\Session::get('api_token');
+                $user = \Illuminate\Support\Facades\Session::get('user');
+                if ($token) {
+                    // Prefer organizer-specific endpoint to avoid counting other organizers' events
+                    try {
+                        $eventsResp = $this->api->withToken($token)->get('events/my-events', ['per_page' => 1000]);
+                        $eventsList = $eventsResp['data']['data'] ?? ($eventsResp['data'] ?? []);
+                    } catch (\Exception $e) {
+                        // Fallback: use generic events endpoint, then filter by current user's id
+                        $fallbackResp = $this->api->withToken($token)->get('events', ['per_page' => 1000]);
+                        $tmpList = $fallbackResp['data']['data'] ?? ($fallbackResp['data'] ?? []);
+                        $userId = $user['id'] ?? null;
+                        $eventsList = array_values(array_filter($tmpList, function ($evt) use ($userId) {
+                            return isset($evt['user_id']) && $userId && $evt['user_id'] == $userId;
+                        }));
+                    }
+
+                    if (is_array($eventsList)) {
+                        foreach ($eventsList as $evt) {
+                            $catId = $evt['category_id'] ?? ($evt['category']['id'] ?? null);
+                            if ($catId) {
+                                $eventsCountByCategory[$catId] = ($eventsCountByCategory[$catId] ?? 0) + 1;
+                            }
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::info('Unable to fetch events for category counts: ' . $e->getMessage());
+            }
+
+            // Attach events_count to each category item
+            $categoriesData = array_map(function ($cat) use ($eventsCountByCategory) {
+                if (!is_array($cat)) return $cat;
+                $id = $cat['id'] ?? null;
+                $cat['events_count'] = $id && isset($eventsCountByCategory[$id])
+                    ? $eventsCountByCategory[$id]
+                    : 0;
+                return $cat;
+            }, $categoriesData);
             
             // Apply client-side search if needed
             if ($request->has('search') && $request->search) {
@@ -50,8 +93,17 @@ class CategoryController extends Controller
                     case 'name_desc':
                         usort($categoriesData, fn($a, $b) => strcasecmp($b['name'] ?? '', $a['name'] ?? ''));
                         break;
+                    case 'events_desc':
+                        usort($categoriesData, fn($a, $b) => (int)($b['events_count'] ?? 0) <=> (int)($a['events_count'] ?? 0));
+                        break;
+                    case 'events_asc':
+                        usort($categoriesData, fn($a, $b) => (int)($a['events_count'] ?? 0) <=> (int)($b['events_count'] ?? 0));
+                        break;
                     case 'active':
                         usort($categoriesData, fn($a, $b) => ($b['is_active'] ?? 0) <=> ($a['is_active'] ?? 0));
+                        break;
+                    case 'inactive':
+                        usort($categoriesData, fn($a, $b) => ($a['is_active'] ?? 0) <=> ($b['is_active'] ?? 0));
                         break;
                 }
             }

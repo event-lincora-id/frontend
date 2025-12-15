@@ -78,7 +78,7 @@
                 <!-- Event Image -->
                 <?php if($event->image_url): ?>
                     <div class="mb-8">
-                        <img src="<?php echo e($event->image_url); ?>" alt="<?php echo e($event->title); ?>" class="w-full h-64 object-cover rounded-lg shadow-lg">
+                        <img src="<?php echo e(app('App\\Services\\BackendApiService')->assetUrl($event->image_url)); ?>" alt="<?php echo e($event->title); ?>" class="w-full h-64 object-cover rounded-lg shadow-lg">
                     </div>
                 <?php endif; ?>
 
