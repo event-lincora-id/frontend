@@ -88,6 +88,20 @@
                     @enderror
                 </div>
 
+                <!-- Meeting Link (for Online/Hybrid Events) -->
+                <div id="meeting-link-container">
+                    <label for="meeting_link" class="block text-sm font-medium text-gray-700">
+                        Meeting Link <span class="text-xs text-gray-500">(for Online/Hybrid events)</span>
+                    </label>
+                    <input type="url" name="meeting_link" id="meeting_link" value="{{ old('meeting_link') }}"
+                           class="admin-input mt-1 block w-full border-gray-300 rounded-md shadow-sm @error('meeting_link') border-red-500 @enderror"
+                           placeholder="https://meet.google.com/xxx or https://zoom.us/j/xxx">
+                    <p class="mt-1 text-xs text-gray-500">Enter the Zoom, Google Meet, Teams, or other meeting platform link</p>
+                    @error('meeting_link')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 <!-- Date and Time -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -223,10 +237,34 @@ document.getElementById('start_date').addEventListener('change', function() {
     const startDate = new Date(this.value);
     const endDateInput = document.getElementById('end_date');
     endDateInput.min = this.value;
-    
+
     if (endDateInput.value && new Date(endDateInput.value) <= startDate) {
         endDateInput.value = '';
     }
 });
+
+// Meeting link conditional visibility
+function toggleMeetingLinkField() {
+    const eventType = document.getElementById('event_type').value;
+    const meetingLinkContainer = document.getElementById('meeting-link-container');
+    const meetingLinkInput = document.getElementById('meeting_link');
+
+    if (eventType === 'online' || eventType === 'hybrid') {
+        meetingLinkContainer.style.display = 'block';
+        meetingLinkInput.setAttribute('required', 'required'); // Make required
+    } else {
+        meetingLinkContainer.style.display = 'none';
+        meetingLinkInput.removeAttribute('required'); // Remove required
+        meetingLinkInput.value = ''; // Clear value when hidden
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleMeetingLinkField();
+});
+
+// Listen for event type changes
+document.getElementById('event_type').addEventListener('change', toggleMeetingLinkField);
 </script>
 @endsection
