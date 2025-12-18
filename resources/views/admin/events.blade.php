@@ -90,7 +90,7 @@
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-12 w-12">
                                 @if(isset($event->image_url) && $event->image_url)
-                                    <img class="h-12 w-12 rounded-lg object-cover" src="{{ $event->image_url }}" alt="{{ $event->title }}">
+                                    <img class="h-12 w-12 rounded-lg object-cover" src="{{ $event->image_url }}" alt="{{ $event->title ?? 'Event' }}" onerror="this.parentElement.innerHTML='<div class=\'h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center\'><i class=\'fas fa-calendar text-gray-400\'></i></div>'">
                                 @else
                                     <div class="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
                                         <i class="fas fa-calendar text-gray-400"></i>
