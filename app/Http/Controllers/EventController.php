@@ -534,6 +534,7 @@ class EventController extends Controller
                 }
             }
         }
+        
         return $object;
     }
 
