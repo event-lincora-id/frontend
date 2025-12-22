@@ -75,10 +75,15 @@
                     <i class="fas fa-tags mr-3"></i>
                     Categories
                 </a>
-                <a href="{{ route('admin.analytics') }}" 
+                <a href="{{ route('admin.analytics') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('admin.analytics*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
                     <i class="fas fa-chart-bar mr-3"></i>
                     Analytics
+                </a>
+                <a href="{{ route('admin.finance.index') }}"
+                   class="flex items-center px-6 py-3 {{ request()->routeIs('admin.finance*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
+                    <i class="fas fa-coins mr-3"></i>
+                    Finance & Withdrawals
                 </a>
             </nav>
             

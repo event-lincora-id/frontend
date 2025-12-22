@@ -3,16 +3,6 @@
 <?php $__env->startSection('page-description', 'Manage your created events'); ?>
 
 <?php $__env->startSection('content'); ?>
-<!-- Action Bar -->
-<div class="mb-6 flex justify-between items-center">
-    <div>
-        <h2 class="text-2xl font-bold text-gray-900">Events Management</h2>
-        <p class="text-gray-600">Manage all events and their details.</p>
-    </div>
-    <a href="<?php echo e(route('admin.events.create')); ?>" style="background-color: var(--color-primary);" class="text-white px-6 py-3 rounded-lg hover:opacity-90 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center text-lg">
-        <i class="fas fa-plus mr-2"></i>Create New Event
-    </a>
-</div>
 
 <div class="bg-white rounded-lg shadow">
     <!-- Header -->

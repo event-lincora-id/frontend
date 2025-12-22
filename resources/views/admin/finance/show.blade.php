@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finance Details - {{ $event->title }}</title>
+    <title>Finance Details - {{ $event['title'] ?? 'Event' }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -30,7 +30,7 @@
         <header class="bg-white shadow-sm border-b">
             <div class="px-6 py-4 flex items-center justify-between">
                 <div>
-                    <h2 class="text-3xl font-bold text-gray-800">{{ $event->title }}</h2>
+                    <h2 class="text-3xl font-bold text-gray-800">{{ $event['title'] ?? 'Event' }}</h2>
                     <p class="text-gray-600">Finance details and transactions</p>
                 </div>
                 <a href="/admin/finance" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"><i class="fas fa-arrow-left mr-2"></i>Back</a>
@@ -65,26 +65,24 @@
                         <tbody class="bg-white divide-y divide-gray-200">
                         @foreach($participants as $p)
                             <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $p->user->full_name ?? $p->user->name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ $p->payment_reference ?? '-' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ strtoupper($p->payment_method ?? '-') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $p['user']['full_name'] ?? $p['user']['name'] ?? '-' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ $p['payment_reference'] ?? '-' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{{ strtoupper($p['payment_method'] ?? '-') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2 py-1 rounded-full text-xs font-medium
-                                        @if($p->payment_status==='paid') bg-green-100 text-green-800
-                                        @elseif($p->payment_status==='pending') bg-yellow-100 text-yellow-800
-                                        @elseif($p->payment_status==='failed') bg-red-100 text-red-800
-                                        @else bg-gray-100 text-gray-800 @endif">{{ strtoupper($p->payment_status ?? '-') }}</span>
+                                        @if(($p['payment_status'] ?? '')==='paid') bg-green-100 text-green-800
+                                        @elseif(($p['payment_status'] ?? '')==='pending') bg-yellow-100 text-yellow-800
+                                        @elseif(($p['payment_status'] ?? '')==='failed') bg-red-100 text-red-800
+                                        @else bg-gray-100 text-gray-800 @endif">{{ strtoupper($p['payment_status'] ?? '-') }}</span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold {{ $p->is_paid ? 'text-green-600' : 'text-gray-600' }}">Rp {{ number_format($p->amount_paid ?? 0, 0, ',', '.') }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $p->created_at->format('M d, Y H:i') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold {{ ($p['is_paid'] ?? false) ? 'text-green-600' : 'text-gray-600' }}">Rp {{ number_format($p['amount_paid'] ?? 0, 0, ',', '.') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ isset($p['created_at']) ? \Carbon\Carbon::parse($p['created_at'])->format('M d, Y H:i') : '-' }}</td>
                             </tr>
                         @endforeach
                         </tbody>
                     </table>
                 </div>
-                <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-                    {{ $participants->links() }}
-                </div>
+            </div>
             </div>
         </div>
     </div>

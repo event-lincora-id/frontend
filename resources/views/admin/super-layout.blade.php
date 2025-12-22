@@ -90,10 +90,16 @@
                     <span>Categories</span>
                 </a>
 
-                <a href="{{ route('super.admin.users') }}" 
+                <a href="{{ route('super.admin.users') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('super.admin.users*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
                     <i class="fas fa-users w-5 mr-3"></i>
                     <span>Users Management</span>
+                </a>
+
+                <a href="{{ route('super.admin.withdrawals.index') }}"
+                   class="flex items-center px-6 py-3 {{ request()->routeIs('super.admin.withdrawals*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
+                    <i class="fas fa-money-check-alt w-5 mr-3"></i>
+                    <span>Withdrawal Management</span>
                 </a>
 
                 <!-- System Section -->

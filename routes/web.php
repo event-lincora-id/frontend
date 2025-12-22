@@ -18,6 +18,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\EventParticipationController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\WithdrawalController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -166,8 +167,9 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
     Route::get('/analytics/export', [AnalyticsController::class, 'export'])->name('admin.analytics.export');
     Route::get('/analytics/realtime', [AnalyticsController::class, 'realtime'])->name('admin.analytics.realtime');
 
-    // Finance
+    // Finance & Withdrawals
     Route::get('/finance', [FinanceController::class, 'index'])->name('admin.finance.index');
+    Route::post('/finance/withdrawals/request', [FinanceController::class, 'withdrawalRequest'])->name('admin.finance.withdrawals.request');
     Route::get('/events/{event}/finance', [FinanceController::class, 'show'])->name('admin.events.finance');
 
     Route::prefix('notifications')->name('admin.notifications.')->group(function () {
@@ -202,7 +204,15 @@ Route::middleware(['api.auth', 'api.role:super_admin'])->prefix('super-admin')->
     
     // Users Management
     Route::get('/users', [SuperAdminController::class, 'users'])->name('users');
-    
+
+    // Withdrawal Management
+    Route::prefix('withdrawals')->name('withdrawals.')->group(function () {
+        Route::get('/', [WithdrawalController::class, 'index'])->name('index');
+        Route::get('/{id}', [WithdrawalController::class, 'show'])->name('show');
+        Route::post('/{id}/approve', [WithdrawalController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [WithdrawalController::class, 'reject'])->name('reject');
+    });
+
     // Debug endpoint
     Route::get('/debug/api', [DebugController::class, 'testSuperAdminApi'])->name('debug.api');
 });
