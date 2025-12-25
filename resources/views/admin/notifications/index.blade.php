@@ -65,9 +65,14 @@
                             $type = $notification['type'] ?? 'default';
                             $iconClass = 'fa-bell';
                             $iconColor = 'text-secondary';
-                            
+
                             switch($type) {
+                                case 'event_registration':
+                                    $iconClass = 'fa-user-plus';
+                                    $iconColor = 'text-success';
+                                    break;
                                 case 'event_reminder':
+                                case 'event_reminder_manual':
                                     $iconClass = 'fa-bell';
                                     $iconColor = 'text-warning';
                                     break;

@@ -43,12 +43,21 @@ class NotificationController extends Controller
             $params['per_page'] = 20;
 
             $response = $this->api->withToken($token)->get('notifications', $params);
-            
-            // Check if API returns paginated data or simple array
-            if (isset($response['data']['data']) && isset($response['data']['pagination'])) {
-                // API returns paginated data
+
+            // Check if API returns paginated data (Laravel paginator structure)
+            if (isset($response['data']['data']) && is_array($response['data']['data'])) {
+                // API returns paginated data - extract the notification items
                 $notifications = collect($response['data']['data']);
-                $pagination = $response['data']['pagination'];
+
+                // Build pagination info from Laravel's paginator structure
+                $pagination = [
+                    'current_page' => $response['data']['current_page'] ?? 1,
+                    'last_page' => $response['data']['last_page'] ?? 1,
+                    'per_page' => $response['data']['per_page'] ?? 20,
+                    'total' => $response['data']['total'] ?? 0,
+                    'from' => $response['data']['from'] ?? null,
+                    'to' => $response['data']['to'] ?? null,
+                ];
             } else {
                 // API returns simple array
                 $notifications = collect($response['data'] ?? []);

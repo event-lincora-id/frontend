@@ -60,6 +60,11 @@
                                     $type = $notification['type'] ?? 'default';
                                 @endphp
                                 @switch($type)
+                                    @case('event_registration')
+                                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-user-plus text-green-600"></i>
+                                        </div>
+                                        @break
                                     @case('attendance_reminder')
                                         <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
                                             <i class="fas fa-clock text-yellow-600"></i>
@@ -91,6 +96,7 @@
                                         </div>
                                         @break
                                     @case('event_reminder')
+                                    @case('event_reminder_manual')
                                         <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                                             <i class="fas fa-bell text-orange-600"></i>
                                         </div>
