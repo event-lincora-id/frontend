@@ -172,7 +172,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-gray-600 font-medium">Total Revenue</p>
-                <p class="text-xl font-bold text-green-600 mt-1">Rp {{ number_format(floor(($stats['total_revenue'] ?? 0) / 1000000)) }}M</p>
+                <p class="text-xl font-bold text-green-600 mt-1">Rp {{ number_format($stats['total_revenue'] ?? 0, 0, ',', '.') }}</p>
             </div>
             <i class="fas fa-coins text-3xl text-green-200"></i>
         </div>

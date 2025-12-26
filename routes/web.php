@@ -162,8 +162,10 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
     Route::post('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('admin.categories.toggle-status');
     Route::get('/categories/{category}/statistics', [CategoryController::class, 'statistics'])->name('admin.categories.statistics');
     
-    // Analytics
-    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('admin.analytics');
+    // Analytics (redirects to dashboard with specific tab)
+    Route::get('/analytics', function() {
+        return redirect()->route('admin.dashboard', ['tab' => 'growth']);
+    })->name('admin.analytics');
     Route::get('/analytics/export', [AnalyticsController::class, 'export'])->name('admin.analytics.export');
     Route::get('/analytics/realtime', [AnalyticsController::class, 'realtime'])->name('admin.analytics.realtime');
 
@@ -179,6 +181,14 @@ Route::get('/payments/status/{participant}', [PaymentController::class, 'status'
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
+
+    // Profile & Certificate Template Management
+    Route::get('/profile', [AdminDashboardController::class, 'profile'])->name('admin.profile');
+    Route::post('/profile/logo', [AdminDashboardController::class, 'uploadLogo'])->name('admin.profile.logo');
+    Route::post('/profile/signature', [AdminDashboardController::class, 'uploadSignature'])->name('admin.profile.signature');
+    Route::delete('/profile/logo', [AdminDashboardController::class, 'deleteLogo'])->name('admin.profile.logo.delete');
+    Route::delete('/profile/signature', [AdminDashboardController::class, 'deleteSignature'])->name('admin.profile.signature.delete');
+    Route::get('/profile/certificate-preview', [AdminDashboardController::class, 'certificatePreview'])->name('admin.profile.preview');
 
 });
 
@@ -204,6 +214,9 @@ Route::middleware(['api.auth', 'api.role:super_admin'])->prefix('super-admin')->
     
     // Users Management
     Route::get('/users', [SuperAdminController::class, 'users'])->name('users');
+    Route::post('/users/{id}/suspend', [SuperAdminController::class, 'suspendUser'])->name('users.suspend');
+    Route::post('/users/{id}/activate', [SuperAdminController::class, 'activateUser'])->name('users.activate');
+    Route::delete('/users/{id}', [SuperAdminController::class, 'deleteUser'])->name('users.delete');
 
     // Withdrawal Management
     Route::prefix('withdrawals')->name('withdrawals.')->group(function () {

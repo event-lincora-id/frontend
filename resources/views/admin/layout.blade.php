@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin Dashboard') - Event Connect</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -55,12 +56,17 @@
                 </div>
             </div>
             <nav class="mt-6">
-                <a href="{{ route('admin.dashboard') }}" 
+                <a href="{{ route('admin.dashboard') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('admin.dashboard') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
                     <i class="fas fa-tachometer-alt mr-3"></i>
                     Dashboard
                 </a>
-                <a href="{{ route('admin.users.index') }}" 
+                <a href="{{ route('admin.profile') }}"
+                   class="flex items-center px-6 py-3 {{ request()->routeIs('admin.profile*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
+                    <i class="fas fa-user-cog mr-3"></i>
+                    Profile & Certificate
+                </a>
+                <a href="{{ route('admin.users.index') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('admin.users.*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
                     <i class="fas fa-users mr-3"></i>
                     Users
@@ -70,15 +76,10 @@
                     <i class="fas fa-calendar-alt mr-3"></i>
                     Events
                 </a>
-                <a href="{{ route('admin.categories.index') }}" 
+                <a href="{{ route('admin.categories.index') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('admin.categories.*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
                     <i class="fas fa-tags mr-3"></i>
                     Categories
-                </a>
-                <a href="{{ route('admin.analytics') }}"
-                   class="flex items-center px-6 py-3 {{ request()->routeIs('admin.analytics*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">
-                    <i class="fas fa-chart-bar mr-3"></i>
-                    Analytics
                 </a>
                 <a href="{{ route('admin.finance.index') }}"
                    class="flex items-center px-6 py-3 {{ request()->routeIs('admin.finance*') ? 'text-white bg-white/20 border-r-4 border-white' : 'text-white/80 hover:bg-white/10' }}">

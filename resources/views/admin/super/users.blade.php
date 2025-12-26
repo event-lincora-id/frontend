@@ -151,10 +151,25 @@
                             {{ ucfirst($user->status ?? 'unknown') }}
                         </span>
                     </td>
-                    <td class="px-6 py-4 text-center">
-                        <a href="#" class="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                            <i class="fas fa-arrow-right"></i>
-                        </a>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            @if($user->role !== 'super_admin')
+                                @if($user->status === 'suspended')
+                                    <button onclick="activateUser({{ $user->id }})" class="px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-medium transition-colors">
+                                        <i class="fas fa-check-circle mr-1"></i> Activate
+                                    </button>
+                                @else
+                                    <button onclick="suspendUser({{ $user->id }})" class="px-3 py-1 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded text-xs font-medium transition-colors">
+                                        <i class="fas fa-ban mr-1"></i> Suspend
+                                    </button>
+                                @endif
+                                <button onclick="confirmDelete({{ $user->id }}, '{{ addslashes($user->name ?? 'this user') }}')" class="px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium transition-colors">
+                                    <i class="fas fa-trash mr-1"></i> Delete
+                                </button>
+                            @else
+                                <span class="text-xs text-gray-500 italic">No actions</span>
+                            @endif
+                        </div>
                     </td>
                 </tr>
                 @endforeach
@@ -209,9 +224,26 @@
                 </div>
             </div>
 
-            <button type="button" class="w-full text-center px-3 py-2 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors">
-                <i class="fas fa-eye mr-1"></i> View Details
-            </button>
+            @if($user->role !== 'super_admin')
+            <div class="flex gap-2">
+                @if($user->status === 'suspended')
+                    <button onclick="activateUser({{ $user->id }})" class="flex-1 px-3 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded text-sm font-medium transition-colors">
+                        <i class="fas fa-check-circle mr-1"></i> Activate
+                    </button>
+                @else
+                    <button onclick="suspendUser({{ $user->id }})" class="flex-1 px-3 py-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded text-sm font-medium transition-colors">
+                        <i class="fas fa-ban mr-1"></i> Suspend
+                    </button>
+                @endif
+                <button onclick="confirmDelete({{ $user->id }}, '{{ addslashes($user->name ?? 'this user') }}')" class="flex-1 px-3 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded text-sm font-medium transition-colors">
+                    <i class="fas fa-trash mr-1"></i> Delete
+                </button>
+            </div>
+            @else
+            <div class="text-center text-xs text-gray-500 italic py-2">
+                No actions available for super admins
+            </div>
+            @endif
         </div>
         @endforeach
     </div>
@@ -257,6 +289,152 @@
     @endif
 </div>
 @endif
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete User</h3>
+            <p class="text-sm text-gray-500 mb-4">
+                Are you sure you want to delete <span id="deleteUserName" class="font-semibold text-gray-900"></span>?
+                This action cannot be undone.
+            </p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                    Cancel
+                </button>
+                <button onclick="deleteUser()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let deleteUserId = null;
+
+// Get CSRF token from meta tag or cookie
+function getCsrfToken() {
+    const token = document.querySelector('meta[name="csrf-token"]');
+    if (token) {
+        return token.getAttribute('content');
+    }
+    // Fallback: try to get from cookie
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'XSRF-TOKEN') {
+            return decodeURIComponent(value);
+        }
+    }
+    return '';
+}
+
+function suspendUser(userId) {
+    if (!confirm('Are you sure you want to suspend this user?')) {
+        return;
+    }
+
+    fetch(`/super-admin/users/${userId}/suspend`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while suspending the user');
+    });
+}
+
+function activateUser(userId) {
+    if (!confirm('Are you sure you want to activate this user?')) {
+        return;
+    }
+
+    fetch(`/super-admin/users/${userId}/activate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while activating the user');
+    });
+}
+
+function confirmDelete(userId, userName) {
+    deleteUserId = userId;
+    document.getElementById('deleteUserName').textContent = userName;
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    deleteUserId = null;
+    document.getElementById('deleteModal').classList.add('hidden');
+}
+
+function deleteUser() {
+    if (!deleteUserId) return;
+
+    fetch(`/super-admin/users/${deleteUserId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': getCsrfToken()
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            closeDeleteModal();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting the user');
+    });
+}
+
+// Close modal when clicking outside
+document.getElementById('deleteModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
+</script>
 
 @endsection
 

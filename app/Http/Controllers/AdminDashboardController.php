@@ -17,7 +17,7 @@ class AdminDashboardController extends Controller
         $this->api = $api;
     }
 
-    public function index()
+    public function index(Request $request)
     {
         try {
             $token = Session::get('api_token');
@@ -32,59 +32,28 @@ class AdminDashboardController extends Controller
                 return redirect()->route('admin.users.index');
             }
 
-            // Get dashboard stats from API
-            $stats = $this->getDashboardStats($token);
-            
-            // Get recent activities
-            $recentActivities = $this->getRecentActivities($token);
-            
-            // Get monthly event data
-            $monthlyEvents = $this->getMonthlyEventData($token);
-            
-            // Get category stats
-            $categoryStats = $this->getCategoryStats($token);
-            
-            // Get user trends (simplified)
-            $userTrends = [];
-            
-            // Get top events
-            $topEvents = $this->getTopEvents($token);
-            
-            return view('admin.dashboard', compact(
-                'stats', 
-                'recentActivities', 
-                'monthlyEvents', 
-                'categoryStats', 
-                'userTrends', 
-                'topEvents'
-            ));
+            // Get date range parameter (default: 30 days)
+            $dateRange = $request->get('date_range', '30');
+
+            // Get dashboard data from Backend API
+            $dashboardData = $this->getDashboardData($token);
+
+            // Get analytics data from Backend API
+            $analyticsData = $this->getAnalyticsData($token, $dateRange);
+
+            // Get balance/finance data from Backend API
+            $balanceData = $this->getBalanceData($token);
+
+            // Merge all data for the view
+            $data = $this->mergeData($dashboardData, $analyticsData, $balanceData, $dateRange);
+
+            return view('admin.dashboard', $data);
+
         } catch (\Exception $e) {
             Log::error('Admin Dashboard error: ' . $e->getMessage());
-            
-            // Return view with empty data
-            return view('admin.dashboard', [
-                'stats' => [
-                    'total_users' => 0,
-                    'total_events' => 0,
-                    'total_categories' => 0,
-                    'total_participants' => 0,
-                    'total_feedbacks' => 0,
-                    'active_events' => 0,
-                    'completed_events' => 0,
-                    'organizers' => 0,
-                    'this_month_events' => 0,
-                    'this_month_participants' => 0,
-                ],
-                'recentActivities' => [],
-                'monthlyEvents' => [
-                    'months' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                    'events' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                ],
-                'categoryStats' => collect([]),
-                'userTrends' => [],
-                'topEvents' => [],
-                'error' => 'Tidak dapat memuat data dashboard'
-            ]);
+
+            // Return view with empty/default data
+            return view('admin.dashboard', $this->getEmptyData($e->getMessage()));
         }
     }
 
@@ -108,221 +77,311 @@ class AdminDashboardController extends Controller
         return redirect()->route('admin.analytics');
     }
     
-    private function getDashboardStats($token)
+    /**
+     * Get dashboard data from Backend API
+     */
+    private function getDashboardData($token)
     {
         try {
-            $user = Session::get('user');
-            
-            // Try to get organizer's events from API
-            $events = collect([]);
-            
-            try {
-                $eventsResponse = $this->api->withToken($token)->get('events/my-events', ['per_page' => 100]);
-                $events = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-            } catch (\Exception $e) {
-                Log::warning('events/my-events failed, trying /events: ' . $e->getMessage());
-
-                // Fallback: get all events and filter by user
-                try {
-                    $eventsResponse = $this->api->withToken($token)->get('events', ['per_page' => 100]);
-                    $allEvents = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-                    
-                    Log::info('Fetched from /events: ' . $allEvents->count() . ' total events');
-                    
-                    // Filter by current user (organizer)
-                    $userId = $user['id'] ?? null;
-                    if ($userId) {
-                        $events = $allEvents->filter(function($event) use ($userId) {
-                            $eventUserId = $event['user_id'] ?? $event['organizer_id'] ?? null;
-                            return $eventUserId == $userId;
-                        })->values();
-                        
-                        Log::info('Filtered events for user ' . $userId . ': ' . $events->count() . ' events');
-                    }
-                } catch (\Exception $e2) {
-                    Log::error('Both endpoints failed: ' . $e2->getMessage());
-                }
-            }
-            
-            // Get categories
-            $categoriesResponse = $this->api->get('categories');
-            $categories = collect($categoriesResponse['data']['data'] ?? []);
-            
-            // Calculate stats
-            $now = Carbon::now();
-            
-            // Calculate total participants from all events
-            $totalParticipants = $events->sum(function($event) {
-                return $event['registered_count'] ?? 0;
-            });
-
-            return [
-                'total_users' => $totalParticipants, // Total participants across all events
-                'total_events' => $events->count(),
-                'total_categories' => $categories->count(),
-                'total_participants' => $totalParticipants,
-                'total_feedbacks' => 0, // API endpoint belum ada
-                'active_events' => $events->filter(function($event) use ($now) {
-                    return isset($event['start_date']) && Carbon::parse($event['start_date'])->isAfter($now);
-                })->count(),
-                'completed_events' => $events->filter(function($event) use ($now) {
-                    return isset($event['end_date']) && Carbon::parse($event['end_date'])->isBefore($now);
-                })->count(),
-                'organizers' => 1,
-                'this_month_events' => $events->filter(function($event) use ($now) {
-                    return isset($event['created_at']) && Carbon::parse($event['created_at'])->month === $now->month;
-                })->count(),
-                'this_month_participants' => $events->filter(function($event) use ($now) {
-                    return isset($event['created_at']) && Carbon::parse($event['created_at'])->month === $now->month;
-                })->sum(function($event) {
-                    return $event['registered_count'] ?? 0;
-                }),
-            ];
+            $response = $this->api->withToken($token)->get('admin/dashboard');
+            return $response['data'] ?? [];
         } catch (\Exception $e) {
-            Log::error('Get dashboard stats error: ' . $e->getMessage());
-            return [
-                'total_users' => 0,
+            Log::warning('Failed to get dashboard data from API: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get analytics data from Backend API
+     */
+    private function getAnalyticsData($token, $dateRange)
+    {
+        try {
+            $response = $this->api->withToken($token)->get('analytics', [
+                'date_range' => $dateRange
+            ]);
+            return $response['data'] ?? [];
+        } catch (\Exception $e) {
+            Log::warning('Failed to get analytics data from API: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get balance/finance data from Backend API
+     */
+    private function getBalanceData($token)
+    {
+        try {
+            $response = $this->api->withToken($token)->get('balance/dashboard');
+            return $response['data'] ?? [];
+        } catch (\Exception $e) {
+            Log::warning('Failed to get balance data from API: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Merge all data sources for the view
+     */
+    private function mergeData($dashboardData, $analyticsData, $balanceData, $dateRange)
+    {
+        return [
+            // Overview tab data
+            'stats' => $dashboardData['stats'] ?? [],
+            'recent_activities' => $dashboardData['recent_activities'] ?? [],
+            'top_events' => $dashboardData['top_events'] ?? [],
+
+            // Revenue tab data
+            'balance' => $balanceData['balance'] ?? [],
+            'balance_statistics' => $balanceData['statistics'] ?? [],
+            'revenue_analytics' => $analyticsData['revenueAnalytics'] ?? [],
+            'total_revenue' => $analyticsData['stats']['total_revenue'] ?? 0,
+
+            // Performance tab data
+            'avg_rating' => $analyticsData['stats']['avg_rating'] ?? 0,
+            'avg_attendance' => $analyticsData['stats']['avg_attendance'] ?? 0,
+            'conversion_rate' => $analyticsData['stats']['conversion_rate'] ?? 0,
+
+            // Growth tab data
+            'monthly_trends' => $analyticsData['monthlyTrends'] ?? [],
+            'category_analytics' => $analyticsData['categoryAnalytics'] ?? [],
+            'user_analytics' => $analyticsData['userAnalytics'] ?? [],
+            'event_analytics' => $analyticsData['eventAnalytics'] ?? [],
+
+            // Common data
+            'date_range' => $dateRange,
+            'date_range_info' => $analyticsData['date_range'] ?? [],
+        ];
+    }
+
+    /**
+     * Get empty/default data for error cases
+     */
+    private function getEmptyData($errorMessage = null)
+    {
+        return [
+            'stats' => [
                 'total_events' => 0,
-                'total_categories' => 0,
-                'total_participants' => 0,
-                'total_feedbacks' => 0,
                 'active_events' => 0,
-                'completed_events' => 0,
-                'organizers' => 0,
+                'total_participants' => 0,
                 'this_month_events' => 0,
-                'this_month_participants' => 0,
-            ];
-        }
+            ],
+            'recent_activities' => [],
+            'top_events' => [],
+            'balance' => [
+                'total_earned' => 0,
+                'available_balance' => 0,
+                'pending_withdrawal' => 0,
+                'platform_fee_total' => 0,
+            ],
+            'balance_statistics' => [],
+            'revenue_analytics' => [],
+            'total_revenue' => 0,
+            'avg_rating' => 0,
+            'avg_attendance' => 0,
+            'conversion_rate' => 0,
+            'monthly_trends' => [],
+            'category_analytics' => [],
+            'user_analytics' => [],
+            'event_analytics' => [],
+            'date_range' => '30',
+            'date_range_info' => [],
+            'error' => $errorMessage ?? 'Tidak dapat memuat data dashboard',
+        ];
     }
 
-    private function getRecentActivities($token)
+    /**
+     * Show admin profile/certificate settings page
+     */
+    public function profile(Request $request)
     {
         try {
-            // Simplified - return dummy data karena API endpoint belum ada
-            return [];
-        } catch (\Exception $e) {
-            Log::error('Get recent activities error: ' . $e->getMessage());
-            return [];
-        }
-    }
+            $token = Session::get('api_token');
 
-    private function getMonthlyEventData($token)
-    {
-        try {
-            $user = Session::get('user');
-            
-            // Get organizer's events
-            $events = collect([]);
-            
-            try {
-                $eventsResponse = $this->api->withToken($token)->get('events/my-events', ['per_page' => 100]);
-                $events = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-            } catch (\Exception $e) {
-                // Fallback to /events with filter
-                try {
-                    $eventsResponse = $this->api->withToken($token)->get('events', ['per_page' => 100]);
-                    $allEvents = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-                    $userId = $user['id'] ?? null;
-                    if ($userId) {
-                        $events = $allEvents->filter(fn($e) => isset($e['user_id']) && $e['user_id'] == $userId)->values();
-                    }
-                } catch (\Exception $e2) {
-                    Log::error('Monthly event data fetch failed: ' . $e2->getMessage());
-                }
+            if (!$token) {
+                return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu');
             }
-            
-            // Initialize months array
-            $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            $eventCounts = array_fill(0, 12, 0);
-            
-            // Count events per month
-            foreach ($events as $event) {
-                if (isset($event['created_at'])) {
-                    $month = Carbon::parse($event['created_at'])->month - 1; // 0-indexed
-                    if ($month >= 0 && $month < 12) {
-                        $eventCounts[$month]++;
-                    }
-                }
+
+            // Get current user profile from backend
+            $response = $this->api->withToken($token)->get('profile');
+
+            if (!$response || !isset($response['success']) || !$response['success']) {
+                return back()->with('error', 'Gagal mengambil data profil');
             }
-            
-            return [
-                'months' => $months,
-                'events' => $eventCounts,
-            ];
+
+            $user = $response['data'];
+
+            return view('admin.profile.index', compact('user'));
+
         } catch (\Exception $e) {
-            Log::error('Get monthly event data error: ' . $e->getMessage());
-            return [
-                'months' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                'events' => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ];
+            Log::error('Admin profile error: ' . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 
-    private function getCategoryStats($token)
+    /**
+     * Upload logo via backend API
+     */
+    public function uploadLogo(Request $request)
     {
         try {
-            $categoriesResponse = $this->api->get('categories');
-            $categories = collect($categoriesResponse['data']['data'] ?? []);
-            
-            return $categories->map(function($category) {
-                return (object)[
-                    'name' => $category['name'] ?? 'Unknown',
-                    'count' => $category['events_count'] ?? 0,
-                    'color' => $category['color'] ?? '#3B82F6',
-                ];
-            });
+            $request->validate([
+                'logo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+            ]);
+
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            // Send file to backend API using postMultipart
+            $response = $this->api->postMultipart('profile/logo', [
+                'logo' => $request->file('logo')
+            ], $token);
+
+            return response()->json($response);
+
         } catch (\Exception $e) {
-            Log::error('Get category stats error: ' . $e->getMessage());
-            return collect([]);
+            Log::error('Logo upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload gagal: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    private function getTopEvents($token)
+    /**
+     * Upload signature via backend API
+     */
+    public function uploadSignature(Request $request)
     {
         try {
-            $user = Session::get('user');
-            
-            $events = collect([]);
-            
-            try {
-                $eventsResponse = $this->api->withToken($token)->get('events/my-events', ['per_page' => 100]);
-                $events = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-            } catch (\Exception $e) {
-                // Fallback to /events with filter
-                try {
-                    $eventsResponse = $this->api->withToken($token)->get('events', ['per_page' => 100]);
-                    $allEvents = collect($eventsResponse['data']['data'] ?? $eventsResponse['data'] ?? []);
-                    $userId = $user['id'] ?? null;
-                    if ($userId) {
-                        $events = $allEvents->filter(fn($e) => isset($e['user_id']) && $e['user_id'] == $userId)->values();
-                    }
-                } catch (\Exception $e2) {
-                    Log::error('Top events fetch failed: ' . $e2->getMessage());
-                }
+            $request->validate([
+                'signature' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+            ]);
+
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
             }
-            
-            return $events
-                ->sortByDesc('registered_count')
-                ->take(5)
-                ->map(function($event) {
-                    return (object)[
-                        'id' => $event['id'] ?? null,
-                        'title' => $event['title'] ?? 'Untitled',
-                        'participants_count' => $event['registered_count'] ?? 0,
-                        'start_date' => isset($event['start_date']) ? Carbon::parse($event['start_date']) : null,
-                        'organizer' => (object)[
-                            'full_name' => $event['organizer']['full_name'] ?? $event['organizer']['name'] ?? 'Unknown',
-                        ],
-                        'category' => (object)[
-                            'color' => $event['category']['color'] ?? '#3B82F6',
-                        ],
-                    ];
-                })
-                ->values()
-                ->toArray();
+
+            // Send file to backend API using postMultipart
+            $response = $this->api->postMultipart('profile/signature', [
+                'signature' => $request->file('signature')
+            ], $token);
+
+            return response()->json($response);
+
         } catch (\Exception $e) {
-            Log::error('Get top events error: ' . $e->getMessage());
-            return [];
+            Log::error('Signature upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload gagal: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete logo
+     */
+    public function deleteLogo(Request $request)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->delete('profile/logo');
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Delete logo error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete signature
+     */
+    public function deleteSignature(Request $request)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->delete('profile/signature');
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Delete signature error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Show certificate preview with sample data
+     */
+    public function certificatePreview(Request $request)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return redirect()->route('login');
+            }
+
+            // Get current user profile from backend
+            $response = $this->api->withToken($token)->get('profile');
+
+            if (!$response || !isset($response['success']) || !$response['success']) {
+                return response('Failed to load preview', 500);
+            }
+
+            $user = $response['data'];
+
+            // Create sample data for preview
+            $sampleData = (object)[
+                'participant_name' => 'John Doe',
+                'event_title' => 'Sample Event Title',
+                'event_date' => now()->format('d F Y'),
+                'organizer_name' => $user['name'] ?? 'Organizer Name',
+                'organizer_logo' => $user['logo_url'] ?? null,
+                'organizer_signature' => $user['signature_url'] ?? null,
+            ];
+
+            return view('admin.profile.certificate-preview', compact('sampleData'));
+
+        } catch (\Exception $e) {
+            Log::error('Certificate preview error: ' . $e->getMessage());
+            return response('Failed to load preview', 500);
         }
     }
 }

@@ -621,21 +621,33 @@ class SuperAdminController extends Controller
             $usersData = [];
             $endpoints = ['super-admin/users', 'admin/users', 'users'];
             
+            $pagination = [];
+
             foreach ($endpoints as $endpoint) {
                 try {
                     $response = $this->api->withToken($token)->get($endpoint, $params);
-                    
+
                     Log::info("Users Response from {$endpoint}:", ['response' => $response]);
-                    
-                    // Try to extract users data
-                    $usersData = $response['data'] ?? $response ?? [];
-                    if (is_array($usersData) && isset($usersData['data'])) {
-                        $usersData = $usersData['data'];
+
+                    // Extract users data based on response structure
+                    if (isset($response['data']['users'])) {
+                        // New API structure
+                        $usersData = $response['data']['users'];
+                        $pagination = $response['data']['pagination'] ?? [];
+                    } elseif (isset($response['data']['data'])) {
+                        // Alternative structure
+                        $usersData = $response['data']['data'];
+                    } elseif (isset($response['data'])) {
+                        // Direct data structure
+                        $usersData = $response['data'];
+                    } else {
+                        $usersData = $response ?? [];
                     }
+
                     if (!is_array($usersData)) {
                         $usersData = [];
                     }
-                    
+
                     // If we got data, break
                     if (!empty($usersData)) {
                         break;
@@ -676,23 +688,38 @@ class SuperAdminController extends Controller
             // Reset array keys after filtering
             $usersData = array_values($usersData);
 
-            // Pagination
-            $perPage = 15;
-            $page = $request->get('page', 1);
-            $total = count($usersData);
-            $offset = ($page - 1) * $perPage;
-            $paginatedUsers = array_slice($usersData, $offset, $perPage);
+            // Use API pagination if available, otherwise manual pagination
+            if (!empty($pagination)) {
+                // Use API pagination (already paginated from backend)
+                $users = new LengthAwarePaginator(
+                    $usersData,
+                    $pagination['total'] ?? count($usersData),
+                    $pagination['per_page'] ?? 15,
+                    $pagination['current_page'] ?? 1,
+                    [
+                        'path' => $request->url(),
+                        'query' => $request->query(),
+                    ]
+                );
+            } else {
+                // Manual client-side pagination (for mock data or old API)
+                $perPage = 15;
+                $page = $request->get('page', 1);
+                $total = count($usersData);
+                $offset = ($page - 1) * $perPage;
+                $paginatedUsers = array_slice($usersData, $offset, $perPage);
 
-            $users = new LengthAwarePaginator(
-                $paginatedUsers,
-                $total,
-                $perPage,
-                $page,
-                [
-                    'path' => $request->url(),
-                    'query' => $request->query(),
-                ]
-            );
+                $users = new LengthAwarePaginator(
+                    $paginatedUsers,
+                    $total,
+                    $perPage,
+                    $page,
+                    [
+                        'path' => $request->url(),
+                        'query' => $request->query(),
+                    ]
+                );
+            }
 
             return view('admin.super.users', compact('users'));
 
@@ -781,5 +808,89 @@ class SuperAdminController extends Controller
         ];
 
         return $mockUsers;
+    }
+
+    /**
+     * Suspend a user
+     */
+    public function suspendUser(Request $request, $id)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->post("super-admin/users/{$id}/suspend", []);
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Super Admin suspend user error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Activate a user
+     */
+    public function activateUser(Request $request, $id)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->post("super-admin/users/{$id}/activate", []);
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Super Admin activate user error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a user
+     */
+    public function deleteUser(Request $request, $id)
+    {
+        try {
+            $token = Session::get('api_token');
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login terlebih dahulu'
+                ], 401);
+            }
+
+            $response = $this->api->withToken($token)->delete("super-admin/users/{$id}");
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Super Admin delete user error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
