@@ -185,7 +185,25 @@ public function index(Request $request): View
             $params['category_id'] = $request->category_id;
             Log::info('Category filter applied:', ['category_id' => $request->category_id]);
         }
-        
+
+        // Add price filter (free/paid)
+        if ($request->filled('is_paid') && $request->is_paid !== '') {
+            $params['is_paid'] = $request->is_paid;
+            Log::info('Price filter applied:', ['is_paid' => $request->is_paid]);
+        }
+
+        // Add date filter
+        if ($request->filled('date_filter')) {
+            $params['date_filter'] = $request->date_filter;
+            Log::info('Date filter applied:', ['date_filter' => $request->date_filter]);
+        }
+
+        // Add sort by
+        if ($request->filled('sort_by')) {
+            $params['sort_by'] = $request->sort_by;
+            Log::info('Sort filter applied:', ['sort_by' => $request->sort_by]);
+        }
+
         // Add pagination
         if ($request->filled('page')) {
             $params['page'] = $request->page;

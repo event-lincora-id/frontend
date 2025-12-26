@@ -143,9 +143,6 @@
                             <a href="<?php echo e(route('admin.events.edit', $event->id)); ?>" class="text-yellow-600 hover:text-yellow-800" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="<?php echo e(route('admin.events.participants', $event->id)); ?>" class="text-green-600 hover:text-green-800" title="Participants">
-                                <i class="fas fa-users"></i>
-                            </a>
                             <button onclick="confirmDelete(<?php echo e($event->id); ?>)" class="text-red-600 hover:text-red-800" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>

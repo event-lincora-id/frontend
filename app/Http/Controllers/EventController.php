@@ -268,7 +268,46 @@ class EventController extends Controller
 
             $participants = array_map(fn($p) => $this->arrayToObject($p), $participantsData);
 
-            return view('admin.events.show', compact('event', 'participants'));
+            // Calculate statistics
+            $stats = [
+                'total' => count($participantsData),
+                'attended' => collect($participantsData)->where('status', 'attended')->count(),
+                'pending' => collect($participantsData)->where('status', 'registered')->count(),
+                'cancelled' => collect($participantsData)->where('status', 'cancelled')->count(),
+            ];
+
+            // Calculate attendance rate
+            $attendanceRate = $stats['total'] > 0
+                ? round(($stats['attended'] / $stats['total']) * 100, 1)
+                : 0;
+
+            // Calculate revenue
+            $paidParticipants = collect($participantsData)->filter(function($p) {
+                return isset($p['is_paid']) && $p['is_paid'] == true;
+            });
+
+            $totalRevenue = $paidParticipants->sum(function($p) {
+                return $p['amount_paid'] ?? 0;
+            });
+
+            $platformFeePercentage = env('PLATFORM_FEE_PERCENTAGE', 5);
+            $platformFee = ($totalRevenue * $platformFeePercentage) / 100;
+            $organizerEarnings = $totalRevenue - $platformFee;
+
+            $revenue = [
+                'total' => $totalRevenue,
+                'paid_count' => $paidParticipants->count(),
+                'platform_fee' => $platformFee,
+                'organizer_earnings' => $organizerEarnings,
+            ];
+
+            return view('admin.events.show', compact(
+                'event',
+                'participants',
+                'stats',
+                'attendanceRate',
+                'revenue'
+            ));
 
         } catch (\Exception $e) {
             Log::error('Events show error: ' . $e->getMessage());

@@ -20,67 +20,134 @@
         <!-- Search and Filter Section -->
         <div class="mb-8" id="filterSection">
             <form method="GET" action="{{ route('events.index') }}" id="searchForm">
-                <!-- Search Bar - 2 Input Horizontal with Category Filter -->
-                <div class="flex gap-4 items-end">
-                    <!-- Search Event Name -->
-                    <div class="flex-1">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Event</label>
-                        <input type="text" 
-                               name="search" 
-                               value="{{ $currentSearch ?? '' }}"
-                               placeholder="Search by event name..."
-                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
-                    </div>
-                    
-                    <!-- Category Filter -->
-                    <div class="w-64">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                        <select name="category_id" 
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                                onchange="this.form.submit()">
-                            <option value="">All Categories</option>
-                            @foreach($categories as $category)
-                                <option value="{{ $category->id }}" 
-                                        {{ ($currentCategory ?? '') == $category->id ? 'selected' : '' }}>
-                                    {{ $category->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    
-                    <!-- Search Button -->
-                    <div>
-                        <button type="submit" 
-                                class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2 transition-colors">
+                <!-- Main Search Bar -->
+                <div class="bg-white rounded-xl shadow-md p-6 mb-4">
+                    <div class="flex flex-col md:flex-row gap-3">
+                        <!-- Large Search Input -->
+                        <div class="flex-1">
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
+                                <input type="text"
+                                       name="search"
+                                       value="{{ request('search') ?? '' }}"
+                                       placeholder="Search events by name, location, or organizer..."
+                                       class="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all">
+                            </div>
+                        </div>
+
+                        <!-- Search Button -->
+                        <button type="submit"
+                                class="bg-red-600 text-white px-8 py-4 rounded-lg hover:bg-red-700 font-semibold text-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
                             <i class="fas fa-search"></i>
-                            <span>Search</span>
+                            <span class="hidden sm:inline">Search</span>
                         </button>
-                    </div>
-                    
-                    <!-- Clear Filters Button -->
-                    @if($currentSearch || $currentCategory)
-                    <div>
-                        <a href="{{ route('events.index') }}" 
-                           class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2 transition-colors">
+
+                        <!-- Advanced Filters Toggle Button -->
+                        <button type="button"
+                                onclick="toggleAdvancedFilters()"
+                                class="bg-gray-100 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-200 font-medium flex items-center justify-center gap-2 transition-all">
+                            <i class="fas fa-sliders-h"></i>
+                            <span class="hidden sm:inline">Filters</span>
+                            <i class="fas fa-chevron-down transition-transform" id="filterIcon"></i>
+                        </button>
+
+                        <!-- Clear Button (shown when filters active) -->
+                        @if(request('search') || request('category_id') || request('is_paid') || request('date_filter') || request('sort_by'))
+                        <a href="{{ route('events.index') }}"
+                           class="bg-gray-200 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-300 flex items-center justify-center gap-2 transition-all">
                             <i class="fas fa-times"></i>
-                            <span>Clear</span>
+                            <span class="hidden sm:inline">Clear</span>
                         </a>
+                        @endif
                     </div>
-                    @endif
+                </div>
+
+                <!-- Advanced Filters Section (Collapsible) -->
+                <div id="advancedFilters" class="bg-gray-50 rounded-xl shadow-sm p-6 mb-4 hidden">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                        <i class="fas fa-filter"></i>
+                        ADVANCED FILTERS
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Category Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-folder mr-1 text-gray-400"></i>
+                                Category
+                            </label>
+                            <select name="category_id"
+                                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    onchange="this.form.submit()">
+                                <option value="">All Categories</option>
+                                @foreach($categories as $category)
+                                    <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                                        {{ $category->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Price Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-1 text-gray-400"></i>
+                                Price
+                            </label>
+                            <select name="is_paid"
+                                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    onchange="this.form.submit()">
+                                <option value="">All Events</option>
+                                <option value="0" {{ request('is_paid') === '0' ? 'selected' : '' }}>Free Only</option>
+                                <option value="1" {{ request('is_paid') === '1' ? 'selected' : '' }}>Paid Only</option>
+                            </select>
+                        </div>
+
+                        <!-- Date Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-calendar mr-1 text-gray-400"></i>
+                                Date Range
+                            </label>
+                            <select name="date_filter"
+                                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    onchange="this.form.submit()">
+                                <option value="">All Dates</option>
+                                <option value="today" {{ request('date_filter') === 'today' ? 'selected' : '' }}>Today</option>
+                                <option value="this_week" {{ request('date_filter') === 'this_week' ? 'selected' : '' }}>This Week</option>
+                                <option value="this_month" {{ request('date_filter') === 'this_month' ? 'selected' : '' }}>This Month</option>
+                            </select>
+                        </div>
+
+                        <!-- Sort Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-sort mr-1 text-gray-400"></i>
+                                Sort By
+                            </label>
+                            <select name="sort_by"
+                                    class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                    onchange="this.form.submit()">
+                                <option value="start_date" {{ request('sort_by') === 'start_date' || !request('sort_by') ? 'selected' : '' }}>Date (Earliest)</option>
+                                <option value="created_at" {{ request('sort_by') === 'created_at' ? 'selected' : '' }}>Newest First</option>
+                                <option value="popularity" {{ request('sort_by') === 'popularity' ? 'selected' : '' }}>Most Popular</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Active Filters Info -->
-                @if($currentSearch || $currentCategory)
-                <div class="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                @if(request('search') || request('category_id') || request('is_paid') || request('date_filter') || request('sort_by'))
+                <div class="mt-4 flex flex-wrap items-center gap-2 text-sm text-gray-600">
                     <span class="font-medium">Active filters:</span>
-                    @if($currentSearch)
+                    @if(request('search'))
                         <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full">
-                            Search: "{{ $currentSearch }}"
+                            Search: "{{ request('search') }}"
                         </span>
                     @endif
-                    @if($currentCategory)
+                    @if(request('category_id'))
                         @php
-                            $selectedCategory = $categories->firstWhere('id', $currentCategory);
+                            $selectedCategory = $categories->firstWhere('id', request('category_id'));
                         @endphp
                         @if($selectedCategory)
                             <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
@@ -88,26 +155,19 @@
                             </span>
                         @endif
                     @endif
+                    @if(request('is_paid') !== null && request('is_paid') !== '')
+                        <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                            Price: {{ request('is_paid') === '0' ? 'Free Only' : 'Paid Only' }}
+                        </span>
+                    @endif
+                    @if(request('date_filter'))
+                        <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full">
+                            Date: {{ ucwords(str_replace('_', ' ', request('date_filter'))) }}
+                        </span>
+                    @endif
                 </div>
                 @endif
             </form>
-        </div>
-
-        <!-- Categories Quick Access -->
-        <div class="mb-8">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">Browse by Category</h2>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <a href="{{ route('events.index') }}" 
-                   class="px-4 py-3 rounded-lg text-center transition-all {{ !$currentCategory ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                    <div class="font-medium">All Events</div>
-                </a>
-                @foreach($categories as $category)
-                    <a href="{{ route('events.index', ['category_id' => $category->id]) }}" 
-                       class="px-4 py-3 rounded-lg text-center transition-all {{ ($currentCategory ?? '') == $category->id ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
-                        <div class="font-medium text-sm">{{ $category->name }}</div>
-                    </a>
-                @endforeach
-            </div>
         </div>
 
        <!-- Results Section -->
@@ -370,7 +430,7 @@
         if (existing) {
             existing.remove();
         }
-        
+
         // Add new hidden input
         const form = document.getElementById('searchForm');
         if (form) {
@@ -379,6 +439,20 @@
             input.name = name;
             input.value = value;
             form.appendChild(input);
+        }
+    }
+
+    // Toggle Advanced Filters
+    function toggleAdvancedFilters() {
+        const filters = document.getElementById('advancedFilters');
+        const icon = document.getElementById('filterIcon');
+
+        if (filters.classList.contains('hidden')) {
+            filters.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+        } else {
+            filters.classList.add('hidden');
+            icon.classList.remove('rotate-180');
         }
     }
 </script>
